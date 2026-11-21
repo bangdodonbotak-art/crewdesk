@@ -116,7 +116,9 @@ export default function InboxDetailPage({
           {thread.body}
         </p>
         <p className="mt-3 text-xs text-muted">
-          Received {new Date(thread.createdAt).toLocaleString()}
+          Received{" "}
+          {new Date(thread.createdAt).toISOString().slice(0, 16).replace("T", " ")}{" "}
+          UTC
         </p>
       </section>
 

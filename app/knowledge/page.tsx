@@ -186,7 +186,7 @@ export default function KnowledgePage() {
                       {item.answer}
                     </p>
                     <p className="mt-3 text-xs text-muted">
-                      Updated {new Date(item.updatedAt).toLocaleDateString()}
+                      Updated {new Date(item.updatedAt).toISOString().slice(0, 10)}
                     </p>
                     <div className="mt-3 flex gap-3">
                       <button

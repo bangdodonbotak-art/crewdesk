@@ -197,7 +197,10 @@ export default function DashboardPage() {
                       <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
                         {thread.status}
                       </span>
-                      <span className="ml-auto text-xs text-muted">
+                      <span
+                        className="ml-auto text-xs text-muted"
+                        suppressHydrationWarning
+                      >
                         {ageText(thread.createdAt)}
                       </span>
                     </span>
