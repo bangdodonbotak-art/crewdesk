@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* CrewDesk design tokens — single source of truth. Max 2 fonts, 1 accent. */
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Space Grotesk", system-ui, sans-serif;
+
+  --color-paper: #faf8f4;
+  --color-ink: #1b1b18;
+  --color-muted: #6b6b64;
+  --color-line: #e5e0d8;
+  --color-accent: #2f5d7a;
+  --color-accent-ink: #ffffff;
+  --color-amber: #8a5a00;
+  --color-green: #2e6b3e;
+  --color-red: #9b2c2c;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
