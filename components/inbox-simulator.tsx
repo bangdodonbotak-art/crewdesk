@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import gsap from "gsap";
 import { DEMO_NOTICE, PLANS } from "@/lib/site-data";
 
 /**
@@ -129,11 +128,25 @@ export default function InboxSimulator() {
     "static" | "armed" | "playing" | "done"
   >("static");
   const [explosionReason, setExplosionReason] = useState("init");
-  const [explodeCaption, setExplodeCaption] = useState(0);
   const [explosionPlaying, setExplosionPlaying] = useState(false);
+  // FIX-REPORT-3D-3: the explosion is driven by React state + CSS
+  // transition, NOT by a GSAP timeline. Round-3 diagnosis: the GSAP
+  // timeline PROGRESSED in real Chrome (captions stepped 1/4→4/4 on time)
+  // but its layer transforms NEVER rendered there, while the same code
+  // showed triage matrix(..., -32) in Obscura — and the live JS is
+  // byte-identical to the local JS, the CSS cannot block the transform
+  // (transition-opacity is opacity-only), there is exactly one set of
+  // [data-layer] targets, and the nodes are stable across re-renders.
+  // No root cause is observable from this VM, so the driver changes:
+  // React owns the transform via a style prop, written to the CURRENT
+  // node on every render — immune to stale-node / killed-timeline /
+  // GSAP-React ownership races. Same values, same 2.4s, same captions.
+  // explodeStep: 0 idle, 1 triage out, 2 +reply out, 3 all out,
+  // 4 all back to identity (reassembling). 0.6s per step.
+  const [explodeStep, setExplodeStep] = useState(0);
+  const explodeTimeoutsRef = useRef<number[]>([]);
   const explosionPlayedRef = useRef(false);
   const explosionArmedRef = useRef(false);
-  const explosionTlRef = useRef<gsap.core.Timeline | null>(null);
   const playExplosionRef = useRef<(() => void) | null>(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [draftShown, setDraftShown] = useState(false);
@@ -184,6 +197,13 @@ export default function InboxSimulator() {
     setHoverPaused(false);
     hoverArmedRef.current = false;
     hoverEnabledRef.current = false;
+  };
+
+  // FIX-REPORT-3D-3: clear the pending explosion chain (Replay clicked
+  // mid-play, unmount). A restart must always begin from step 1.
+  const clearExplodeTimeouts = () => {
+    explodeTimeoutsRef.current.forEach((t) => window.clearTimeout(t));
+    explodeTimeoutsRef.current = [];
   };
 
   // Mount: one ambient auto-play cycle — or a static review frame when the
@@ -299,19 +319,23 @@ export default function InboxSimulator() {
     return () => clearTimeout(timer);
   }, [running, paused, currentStep, stage, isAuto]);
 
-  // "The inbox, exploded" — the single 3D moment (GSAP only, 0 KB new
-  // bundle), as an INTO-VIEW AUTO-PLAY (FIX-REPORT-3D-2). The scroll
-  // hold failed twice live (GSAP pin, then CSS sticky) with no
-  // measurable root cause, and the 160vh scroll room left a 3–4
-  // viewport empty hole on the live page — so there is no hold, no
-  // spacer, no scrub at all anymore. When the card is half visible
-  // the three step layers split apart in shallow 2.5D (translateZ +
-  // small rotateX, no nested preserve-3d) and reassemble (~2.4s),
-  // captions stepping 1/4→4/4 with a guaranteed 0.6s dwell each.
-  // The step engine pauses for the 2.4s, then resumes where it left
-  // off. Replay re-runs it (same "watch the demo again" intent as
-  // the steps). Desktop fine-pointer ≥1025px + no reduced-motion
-  // only; everywhere else the card is static, exactly as before.
+  // "The inbox, exploded" — the single 3D moment, as an INTO-VIEW
+  // AUTO-PLAY driven by React state + CSS transition (FIX-REPORT-3D-3).
+  // The scroll hold failed twice live (GSAP pin, then CSS sticky), and
+  // the GSAP-timeline auto-play failed a third time: the timeline
+  // PROGRESSED in real Chrome (captions stepped 1/4-4/4 on time) but
+  // its layer transforms never rendered there, while the same code
+  // showed triage at y -32 in Obscura. No root cause is observable
+  // from this VM (live JS byte-identical, CSS cannot block it, one set
+  // of targets, nodes stable), so the driver changes instead of the
+  // numbers: React owns the transform via a style prop on the CURRENT
+  // node — no timeline to kill, no selector to resolve, no stale node.
+  // When the card is half visible the three step layers split apart in
+  // shallow 2.5D and reassemble (~2.4s), captions stepping 1/4-4/4
+  // with a guaranteed 0.6s dwell each. The step engine pauses for the
+  // 2.4s, then resumes where it left off. Replay re-runs it.
+  // Desktop fine-pointer >=1025px + no reduced-motion only; everywhere
+  // else the card is static, exactly as before.
   useEffect(() => {
     if (reducedMotion || !explosionArmedRef.current) return;
     const el = containerRef.current;
@@ -319,51 +343,26 @@ export default function InboxSimulator() {
     const play = () => {
       if (explosionPlayedRef.current) return;
       explosionPlayedRef.current = true;
-      explosionTlRef.current?.kill();
+      // Restart cleanly: clear any pending chain (e.g. Replay clicked
+      // mid-play) so the steps always start from 1 — the old GSAP
+      // timeline's kill-mid-play left layers at mid-flight values.
+      clearExplodeTimeouts();
       setExplosionPlaying(true);
       setExplosionState("playing");
-      const tl = gsap.timeline({
-        onUpdate: () => {
-          const q = Math.min(3, Math.floor(tl.progress() * 4));
-          setExplodeCaption((prev) => (prev === q ? prev : q));
-        },
-        onComplete: () => {
+      setExplodeStep(1);
+      // 0.6s per quarter, same timing as the old timeline:
+      // 1 = triage out, 2 = +reply out, 3 = all out,
+      // 4 = all back to identity, then done at 2.4s.
+      explodeTimeoutsRef.current = [
+        window.setTimeout(() => setExplodeStep(2), 600),
+        window.setTimeout(() => setExplodeStep(3), 1200),
+        window.setTimeout(() => setExplodeStep(4), 1800),
+        window.setTimeout(() => {
+          setExplodeStep(0);
           setExplosionPlaying(false);
           setExplosionState("done");
-          setExplodeCaption(0);
-        },
-      });
-      explosionTlRef.current = tl;
-      tl.to(
-        '[data-layer="triage"]',
-        { y: -32, rotationX: -8, z: 30, duration: 0.6, ease: "power1.inOut" },
-        0,
-      )
-        .to(
-          '[data-layer="reply"]',
-          { y: 0, rotationX: 0, z: 70, scale: 1.02, duration: 0.6, ease: "power1.inOut" },
-          0.6,
-        )
-        .to(
-          '[data-layer="approve"]',
-          { y: 32, rotationX: 8, z: 30, duration: 0.6, ease: "power1.inOut" },
-          1.2,
-        )
-        .to(
-          '[data-layer="triage"]',
-          { y: 0, rotationX: 0, z: 0, duration: 0.6, ease: "power1.inOut" },
-          1.8,
-        )
-        .to(
-          '[data-layer="reply"]',
-          { y: 0, rotationX: 0, z: 0, scale: 1, duration: 0.6, ease: "power1.inOut" },
-          1.8,
-        )
-        .to(
-          '[data-layer="approve"]',
-          { y: 0, rotationX: 0, z: 0, duration: 0.6, ease: "power1.inOut" },
-          1.8,
-        );
+        }, 2400),
+      ];
     };
     // Replay button re-runs the explosion (same intent as re-running
     // the steps). No-op on mobile / reduced-motion (ref unset there).
@@ -385,8 +384,7 @@ export default function InboxSimulator() {
     return () => {
       observer.disconnect();
       playExplosionRef.current = null;
-      explosionTlRef.current?.kill();
-      explosionTlRef.current = null;
+      clearExplodeTimeouts();
     };
   }, [reducedMotion]);
 
@@ -474,6 +472,29 @@ export default function InboxSimulator() {
         ? (currentStep + 1) / STEPS.length
         : 1;
 
+  // FIX-REPORT-3D-3: layer transform from React state (explodeStep).
+  // Same values as the old GSAP timeline (triage y -32 / rotX -8 / z 30;
+  // reply z 70 / scale 1.02; approve y +32 / rotX +8 / z 30), same 0.6s
+  // per step. Identity keeps the same function list so the browser
+  // interpolates smoothly. The transition lives in the inline style so
+  // it cannot be overridden by the Tailwind transition-opacity class.
+  const layerTransform = (id: string): string => {
+    const out =
+      id === "triage"
+        ? explodeStep >= 1 && explodeStep <= 3
+        : id === "reply"
+          ? explodeStep >= 2 && explodeStep <= 3
+          : explodeStep === 3;
+    if (!out) {
+      return id === "reply"
+        ? "translate3d(0px, 0px, 0px) scale(1)"
+        : "translate3d(0px, 0px, 0px) rotateX(0deg)";
+    }
+    if (id === "triage") return "translate3d(0px, -32px, 30px) rotateX(-8deg)";
+    if (id === "reply") return "translate3d(0px, 0px, 70px) scale(1.02)";
+    return "translate3d(0px, 32px, 30px) rotateX(8deg)";
+  };
+
   return (
     <div
       ref={containerRef}
@@ -559,7 +580,7 @@ export default function InboxSimulator() {
       {explosionState !== "static" && (
         <p className="mt-3 font-mono text-xs text-accent" aria-live="polite">
           {explosionPlaying
-            ? EXPLODE_CAPTIONS[explodeCaption]
+            ? EXPLODE_CAPTIONS[Math.max(0, explodeStep - 1)]
             : "Watch one message pull apart — Triage · Reply · Approve"}
         </p>
       )}
@@ -672,6 +693,10 @@ export default function InboxSimulator() {
               <li
                 key={step.id}
                 data-layer={step.id}
+                style={{
+                  transform: layerTransform(step.id),
+                  transition: "transform 0.6s ease-in-out, opacity 0.3s ease",
+                }}
                 className={`flex gap-4 transition-opacity duration-300 ${
                   isDone && !isCurrent ? "opacity-55" : "opacity-100"
                 }`}
