@@ -165,6 +165,22 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* F-5: the Knowledge base had no link from anywhere. */}
+      <nav aria-label="Dashboard" className="mt-4 flex flex-wrap gap-5 text-sm">
+        <Link
+          href="/knowledge"
+          className="inline-flex min-h-11 items-center text-accent hover:underline"
+        >
+          Knowledge base
+        </Link>
+        <Link
+          href="/settings"
+          className="inline-flex min-h-11 items-center text-muted hover:text-paper"
+        >
+          Settings
+        </Link>
+      </nav>
+
       <div className="mt-5 flex gap-2" role="tablist" aria-label="Inbox source">
         <button
           type="button"

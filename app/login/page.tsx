@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -24,6 +24,18 @@ function LoginForm() {
         : null,
   );
   const configured = isSupabaseConfigured();
+  // F-2: the "Sign out" button used to render unconditionally, so
+  // signed-out visitors saw it too. It renders only when a session
+  // actually exists.
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setSignedIn(Boolean(data.session)))
+      .catch(() => setSignedIn(false));
+  }, []);
 
   async function signInWithGoogle() {
     const supabase = getSupabaseBrowser();
@@ -118,13 +130,15 @@ function LoginForm() {
           >
             Explore the demo dashboard
           </Link>
-          <button
-            type="button"
-            onClick={signOut}
-            className="mt-2 ml-3 inline-flex min-h-11 items-center text-sm text-muted hover:text-paper"
-          >
-            Sign out
-          </button>
+          {signedIn && (
+            <button
+              type="button"
+              onClick={signOut}
+              className="mt-2 ml-3 inline-flex min-h-11 items-center text-sm text-muted hover:text-paper"
+            >
+              Sign out
+            </button>
+          )}
         </div>
       </div>
     </main>

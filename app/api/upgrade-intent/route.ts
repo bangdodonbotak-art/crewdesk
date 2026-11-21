@@ -14,6 +14,16 @@ import { requireUser } from "@/lib/crew/db";
 const VALID_PLANS = ["starter", "growth"] as const;
 type UpgradePlan = (typeof VALID_PLANS)[number];
 
+// Waitlist guardrails (ensemble): the endpoint accepts signed-out
+// visitors, so a bare insert would fill the table with garbage and
+// duplicates. Validate the format server-side (the form also validates
+// client-side) and de-dup on (email, plan) — return ok + duplicate
+// instead of a second row. No unique constraint is added to the table
+// (no schema changes in this round); the select-then-insert is
+// best-effort. Full bot-proofing (IP rate limit / CAPTCHA) needs a new
+// service and is an open TODO, not part of this build.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -32,6 +42,14 @@ export async function POST(request: Request) {
   }
   if (email !== undefined && typeof email !== "string") {
     return NextResponse.json({ ok: false, error: "email must be a string." }, { status: 400 });
+  }
+  const cleanEmail =
+    typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (cleanEmail !== "" && (cleanEmail.length > 254 || !EMAIL_RE.test(cleanEmail))) {
+    return NextResponse.json(
+      { ok: false, error: "email must be a valid email address." },
+      { status: 400 },
+    );
   }
 
   const admin = getSupabaseAdmin();
@@ -52,10 +70,31 @@ export async function POST(request: Request) {
     userId = null;
   }
 
+  // De-dup: one row per (email, plan). A repeat submit returns ok +
+  // duplicate instead of a second row (the form shows "already on the
+  // list" — the caller never learns whether the address existed).
+  if (cleanEmail !== "") {
+    const { data: existing } = await admin
+      .from("upgrade_intents")
+      .select("id")
+      .eq("email", cleanEmail)
+      .eq("plan", plan as UpgradePlan)
+      .maybeSingle();
+    if (existing) {
+      return NextResponse.json({
+        ok: true,
+        recorded: false,
+        duplicate: true,
+        plan: plan as UpgradePlan,
+        note: "Already on the waitlist for this plan.",
+      });
+    }
+  }
+
   const { error } = await admin.from("upgrade_intents").insert({
     user_id: userId,
     plan: plan as UpgradePlan,
-    email: typeof email === "string" && email.trim() !== "" ? email.trim() : null,
+    email: cleanEmail !== "" ? cleanEmail : null,
     status: "new",
   });
   if (error) {

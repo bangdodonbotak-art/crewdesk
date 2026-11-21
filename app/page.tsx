@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { DEMO_NOTICE, FAQ, HERO, PLANS, SITE } from "@/lib/site-data";
 import InboxSimulator, { STEPS } from "@/components/inbox-simulator";
+import WaitlistForm from "@/components/waitlist-form";
 import Reveal from "@/components/reveal";
 import { useMotion } from "@/components/motion-provider";
 
@@ -93,6 +94,9 @@ function StickyMobileCta() {
 
 export default function LandingPage() {
   const { reducedMotion } = useMotion();
+  // Day inbox count — the 6 demo threads draining to zero across the
+  // workday. Updated by the scrub via ref (no re-render per tick).
+  const dayCountRef = useRef<HTMLSpanElement>(null);
 
   // Hero entrance (mount) + the page's only scrub (timeline line).
   // Transform + opacity only; skipped entirely on reduced-motion.
@@ -100,20 +104,30 @@ export default function LandingPage() {
     if (reducedMotion) return;
     gsap.registerPlugin(ScrollTrigger);
     const ctx = gsap.context(() => {
+      // F-4: the old entrance started at opacity 0, so hero text and the
+      // pricing "$0" were nearly unreadable for ~1 s. Floor is 0.4 with
+      // shorter durations, and clearProps restores the natural state so
+      // CSS :hover transforms (CTA lift, pricing card lift) work again —
+      // the inline transform left by gsap.from was overriding them.
       gsap.from('[data-hero="line1"]', {
-        y: 24, opacity: 0, duration: 0.8, ease: "power3.out",
+        y: 24, opacity: 0.4, duration: 0.6, ease: "power3.out",
+        clearProps: "transform,opacity",
       });
       gsap.from('[data-hero="line2"]', {
-        y: 24, opacity: 0, duration: 0.8, delay: 0.12, ease: "power3.out",
+        y: 24, opacity: 0.4, duration: 0.6, delay: 0.08, ease: "power3.out",
+        clearProps: "transform,opacity",
       });
       gsap.from('[data-hero="sub"]', {
-        y: 16, opacity: 0, duration: 0.7, delay: 0.25, ease: "power2.out",
+        y: 16, opacity: 0.4, duration: 0.6, delay: 0.15, ease: "power2.out",
+        clearProps: "transform,opacity",
       });
       gsap.from('[data-hero="cta"]', {
-        y: 16, opacity: 0, duration: 0.7, delay: 0.25, ease: "power2.out",
+        y: 16, opacity: 0.4, duration: 0.6, delay: 0.15, ease: "power2.out",
+        clearProps: "transform,opacity",
       });
       gsap.from('[data-hero="sim"]', {
-        y: 24, opacity: 0, duration: 0.8, delay: 0.35, ease: "power3.out",
+        y: 24, opacity: 0.4, duration: 0.6, delay: 0.2, ease: "power3.out",
+        clearProps: "transform,opacity",
       });
       // Hero glow fades as the hero scrolls away (scrub, opacity only).
       gsap.to(".hero-glow-el", {
@@ -146,6 +160,41 @@ export default function LandingPage() {
         stagger: 0.12,
         scrollTrigger: { trigger: "#day-timeline", start: "top 85%", once: true },
       });
+      // Day scrims + inbox count (ensemble: the day PIN was cut — no
+      // second pinned scrollytelling system. Scrims and count are cheap
+      // opacity/text scrubs only). Scrims sit BEHIND the content
+      // (content wrapper is relative), so text contrast never drops.
+      // The count is the 6 demo threads draining to zero, labelled as
+      // an example workday — not a product promise.
+      gsap
+        .timeline({
+          scrollTrigger: {
+            trigger: "#day-timeline",
+            start: "top 80%",
+            end: "bottom 40%",
+            scrub: true,
+            onUpdate: (self) => {
+              const el = dayCountRef.current;
+              if (!el) return;
+              const n =
+                self.progress < 0.25
+                  ? 6
+                  : self.progress < 0.5
+                    ? 4
+                    : self.progress < 0.75
+                      ? 2
+                      : 0;
+              if (el.textContent !== String(n)) el.textContent = String(n);
+            },
+          },
+        })
+        .to(".day-scrim-morning", { opacity: 1, duration: 1, ease: "none" }, 0)
+        .to(".day-scrim-morning", { opacity: 0, duration: 1, ease: "none" }, 1)
+        .to(".day-scrim-midday", { opacity: 1, duration: 1, ease: "none" }, 1)
+        .to(".day-scrim-midday", { opacity: 0, duration: 1, ease: "none" }, 2)
+        .to(".day-scrim-afternoon", { opacity: 1, duration: 1, ease: "none" }, 2)
+        .to(".day-scrim-afternoon", { opacity: 0, duration: 1, ease: "none" }, 3)
+        .to(".day-scrim-night", { opacity: 1, duration: 1, ease: "none" }, 3);
     });
     return () => ctx.revert();
   }, [reducedMotion]);
@@ -252,14 +301,23 @@ export default function LandingPage() {
 
         {/* A day with CrewDesk — the scroll unit */}
         <Reveal staggerChildren delay={0.12}>
-        <section className="border-y border-line bg-panel">
-          <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
+        <section className="relative overflow-hidden border-y border-line bg-panel">
+          {/* Light-shift scrims (opacity only, behind the content). */}
+          <div aria-hidden="true" className="day-scrim-morning pointer-events-none absolute inset-0 bg-[rgba(0,229,255,0.07)] opacity-0" />
+          <div aria-hidden="true" className="day-scrim-midday pointer-events-none absolute inset-0 bg-[rgba(247,248,248,0.05)] opacity-0" />
+          <div aria-hidden="true" className="day-scrim-afternoon pointer-events-none absolute inset-0 bg-[rgba(255,176,32,0.08)] opacity-0" />
+          <div aria-hidden="true" className="day-scrim-night pointer-events-none absolute inset-0 bg-[rgba(7,8,10,0.5)] opacity-0" />
+          <div className="relative mx-auto max-w-6xl px-4 py-24 sm:px-6">
             <h2 data-reveal-child className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">
               A day with CrewDesk
             </h2>
             <p data-reveal-child className="mt-3 max-w-2xl leading-relaxed text-muted">
               One workday, four hours. Morning the inbox piles up, midday the
               crew works, afternoon you approve, night the inbox is empty.
+            </p>
+            <p data-reveal-child className="mt-4 inline-flex items-center gap-2 rounded-full border border-line bg-panel-2 px-3 py-1 font-mono text-xs text-muted">
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-accent" />
+              Demo inbox · example workday — <span ref={dayCountRef}>6</span> messages left
             </p>
             <ol id="day-timeline" className="relative mt-10 space-y-0">
               <div aria-hidden="true" className="timeline-line absolute -left-[2px] bottom-2 top-2 w-0.5 origin-top bg-line" />
@@ -351,12 +409,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   {plan.comingSoon ? (
-                    <a
-                      href="/login"
-                      className="mt-6 inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-5 text-sm font-semibold text-paper transition-transform duration-200 hover:-translate-y-px hover:border-accent active:translate-y-0 active:scale-[0.98]"
-                    >
-                      {ctaLabel}
-                    </a>
+                    <WaitlistForm plan="growth" />
                   ) : isStarter ? (
                     <a
                       href="/login"
@@ -421,7 +474,7 @@ export default function LandingPage() {
               {SITE.tagline} It finishes the work, you approve, it ships.
             </p>
           </div>
-          <nav aria-label="Footer" className="flex gap-8 text-sm">
+          <nav aria-label="Footer" className="flex flex-wrap gap-8 text-sm">
             <a data-reveal-child href="#product" className="flex min-h-11 items-center whitespace-nowrap text-muted hover:text-paper active:text-paper">
               Product
             </a>
@@ -430,6 +483,12 @@ export default function LandingPage() {
             </a>
             <a data-reveal-child href="#faq" className="flex min-h-11 items-center whitespace-nowrap text-muted hover:text-paper active:text-paper">
               FAQ
+            </a>
+            <a data-reveal-child href="/dashboard" className="flex min-h-11 items-center whitespace-nowrap text-muted hover:text-paper active:text-paper">
+              Dashboard
+            </a>
+            <a data-reveal-child href="/knowledge" className="flex min-h-11 items-center whitespace-nowrap text-muted hover:text-paper active:text-paper">
+              Knowledge base
             </a>
           </nav>
         </div>

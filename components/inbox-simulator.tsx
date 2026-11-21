@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { DEMO_NOTICE, PLANS } from "@/lib/site-data";
 
 /**
@@ -86,6 +88,15 @@ type Stage = "idle" | "working" | "review" | "editing" | "sent" | "rejected";
 
 const STEP_MS = 2750;
 
+// Scrub captions for "The inbox, exploded" — one per quarter of the
+// pinned scrub. Plain product copy, no invented numbers.
+const EXPLODE_CAPTIONS = [
+  "1 / 4 — Triage: the crew reads the message",
+  "2 / 4 — Reply: a draft from your knowledge base",
+  "3 / 4 — Approve: you decide",
+  "4 / 4 — Sent: it ships",
+];
+
 export default function InboxSimulator() {
   const [exampleId, setExampleId] = useState<string>(EXAMPLES[0].id);
   const [customerMessage, setCustomerMessage] = useState<string>(
@@ -100,16 +111,49 @@ export default function InboxSimulator() {
   const [manualPaused, setManualPaused] = useState(false);
   const [hoverPaused, setHoverPaused] = useState(false);
   const [outOfViewPaused, setOutOfViewPaused] = useState(false);
+  // scrollMode: the pinned "exploded" scrub owns the card while active —
+  // the timer-driven step engine is suspended, never fighting the scrub.
+  // One controller at a time: ambient OR scroll OR manual (ensemble).
+  const [scrollMode, setScrollMode] = useState(false);
+  // scrubReady: true only when the pinned scrub was actually installed
+  // (desktop fine pointer, >4 cores, no reduced-motion). The scrub
+  // caption renders only then — never a promise the page cannot keep.
+  const [scrubReady, setScrubReady] = useState(false);
+  const [explodeCaption, setExplodeCaption] = useState(0);
   const [userInteracted, setUserInteracted] = useState(false);
   const [draftShown, setDraftShown] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const prevInViewRef = useRef(false);
-  const paused = manualPaused || hoverPaused || outOfViewPaused;
+  // Hover-pause is armed by default so the first hover pauses the ambient
+  // cycle. clearPause() DISARMS it: after Resume the timer must actually
+  // run while the pointer is still over the card — it re-arms only on a
+  // fresh pointerleave → mouseenter cycle (F-1 root cause).
+  const hoverArmedRef = useRef(true);
+  // Hover/focus pause only exists on devices that really hover
+  // ((hover: hover) and (pointer: fine)). Coarse pointers never set
+  // hoverPaused — on touch a tap would otherwise freeze the engine
+  // with no pointerleave to release it (ensemble).
+  const canHoverPauseRef = useRef(false);
+  const paused =
+    manualPaused || hoverPaused || outOfViewPaused || scrollMode;
+
+  // Atomic pause reset: clears EVERY pause flag at once (ensemble — the
+  // old Resume cleared only manualPaused, so hoverPaused kept the timer
+  // frozen). Also disarms hover-pause until the pointer leaves and
+  // re-enters, so Resume works while the pointer stays over the card.
+  const clearPause = () => {
+    setManualPaused(false);
+    setHoverPaused(false);
+    hoverArmedRef.current = false;
+  };
 
   // Mount: one ambient auto-play cycle — or a static review frame when the
   // user prefers reduced motion.
   useEffect(() => {
+    canHoverPauseRef.current = window.matchMedia(
+      "(hover: hover) and (pointer: fine)",
+    ).matches;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (mq.matches) {
       setReducedMotion(true);
@@ -194,11 +238,105 @@ export default function InboxSimulator() {
     return () => clearTimeout(timer);
   }, [running, paused, currentStep, stage, isAuto]);
 
+  // "The inbox, exploded" — the single 3D moment (CSS/GSAP only, 0 KB
+  // new bundle). One pinned desktop scrub: the three step layers split
+  // apart in shallow 2.5D (translateZ + small rotateX, no nested
+  // preserve-3d), then reassemble. Scroll backwards rewinds the story.
+  //
+  // Gates (all must hold, ensemble decisions): min-width 1025px AND fine
+  // pointer (never pin at exactly 1024px — Tailwind lg: starts there),
+  // hardwareConcurrency > 4 (low-end desktops get the static card),
+  // no prefers-reduced-motion. ONE pin on the whole page (the day pin
+  // was cut). The scrub is VISUAL ONLY — it never drives the step
+  // engine; while the pin is active scrollMode suspends the timer, so
+  // ambient, scroll, and manual never fight (single-controller rule).
+  // Mobile / coarse pointer / low-core / reduced-motion: no pin, no
+  // scrub — the simulator renders exactly as before.
+  useEffect(() => {
+    if (reducedMotion) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const cores =
+      typeof navigator !== "undefined"
+        ? (navigator.hardwareConcurrency ?? 8)
+        : 8;
+    if (cores <= 4) return;
+    gsap.registerPlugin(ScrollTrigger);
+    const mm = gsap.matchMedia();
+    mm.add("(min-width: 1025px) and (pointer: fine)", () => {
+      setScrubReady(true);
+      // Scoped context: selector text below resolves inside this card
+      // only, and ctx.revert() kills the timeline + ScrollTrigger +
+      // clears the inline transforms on unmount or breakpoint exit.
+      const ctx = gsap.context(() => {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: el,
+            start: "top top+=72",
+            end: "+=160%",
+            pin: true,
+            scrub: 1,
+            anticipatePin: 1,
+            onToggle: (self: { isActive: boolean }) =>
+              setScrollMode(self.isActive),
+            onUpdate: (self: { progress: number }) => {
+              const q = Math.min(3, Math.floor(self.progress * 4));
+              setExplodeCaption((prev) => (prev === q ? prev : q));
+            },
+          },
+        });
+        tl.to(
+          '[data-layer="triage"]',
+          { y: -32, rotationX: -8, z: 30, duration: 1, ease: "none" },
+          0,
+        )
+          .to(
+            '[data-layer="reply"]',
+            {
+              y: 0,
+              rotationX: 0,
+              z: 70,
+              scale: 1.02,
+              duration: 1,
+              ease: "none",
+            },
+            1,
+          )
+          .to(
+            '[data-layer="approve"]',
+            { y: 32, rotationX: 8, z: 30, duration: 1, ease: "none" },
+            2,
+          )
+          .to(
+            '[data-layer="triage"]',
+            { y: 0, rotationX: 0, z: 0, duration: 1, ease: "none" },
+            3,
+          )
+          .to(
+            '[data-layer="reply"]',
+            { y: 0, rotationX: 0, z: 0, scale: 1, duration: 1, ease: "none" },
+            3,
+          )
+          .to(
+            '[data-layer="approve"]',
+            { y: 0, rotationX: 0, z: 0, duration: 1, ease: "none" },
+            3,
+          );
+      }, el);
+      return () => {
+        ctx.revert();
+        setScrollMode(false);
+        setScrubReady(false);
+      };
+    });
+    return () => mm.revert();
+  }, [reducedMotion]);
+
   const stopAmbient = () => {
     setRunning(false);
     setIsAuto(false);
     setAutoDone(false);
-    setManualPaused(false);
+    clearPause();
     setUserInteracted(true);
   };
 
@@ -222,7 +360,7 @@ export default function InboxSimulator() {
   const replay = () => {
     setUserInteracted(true);
     setAutoDone(false);
-    setManualPaused(false);
+    clearPause();
     setStage("working");
     setCurrentStep(0);
     setRunning(true);
@@ -272,12 +410,21 @@ export default function InboxSimulator() {
     <div
       ref={containerRef}
       className="rounded-xl border border-line bg-panel p-5 shadow-sm sm:p-6"
-      onMouseEnter={() => setHoverPaused(true)}
-      onMouseLeave={() => setHoverPaused(false)}
-      onFocus={() => setHoverPaused(true)}
+      onMouseEnter={() => {
+        if (canHoverPauseRef.current && hoverArmedRef.current)
+          setHoverPaused(true);
+      }}
+      onMouseLeave={() => {
+        setHoverPaused(false);
+        hoverArmedRef.current = true;
+      }}
+      onFocus={() => {
+        if (canHoverPauseRef.current) setHoverPaused(true);
+      }}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node)) {
           setHoverPaused(false);
+          hoverArmedRef.current = true;
         }
       }}
     >
@@ -320,6 +467,17 @@ export default function InboxSimulator() {
           {DEMO_NOTICE}
         </span>
       </div>
+
+      {/* Scrub caption — rendered only when the pinned scrub is actually
+          installed (desktop fine pointer, >4 cores). Never a promise the
+          page cannot keep. */}
+      {scrubReady && (
+        <p className="mt-3 font-mono text-xs text-accent" aria-live="polite">
+          {scrollMode
+            ? EXPLODE_CAPTIONS[explodeCaption]
+            : "Scroll to pull one message apart — Triage · Reply · Approve"}
+        </p>
+      )}
 
       {/* Example picker */}
       <div className="mt-5">
@@ -374,7 +532,13 @@ export default function InboxSimulator() {
         {running && !reducedMotion && (
           <button
             type="button"
-            onClick={() => setManualPaused((p) => !p)}
+            onClick={() => {
+              // Resume must clear EVERY pause flag at once (F-1): the old
+              // toggle cleared only manualPaused, so hoverPaused kept the
+              // timer frozen while the pointer stayed over the card.
+              if (manualPaused) clearPause();
+              else setManualPaused(true);
+            }}
             aria-pressed={manualPaused}
             className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper transition-transform duration-150 hover:border-accent active:scale-[0.98]"
           >
@@ -412,13 +576,14 @@ export default function InboxSimulator() {
 
       {/* Crew steps — fixed min-height, no layout shift when steps change */}
       <div className="mt-6 min-h-[240px] border-t border-line pt-6 sm:min-h-[216px]">
-        <ol className="space-y-4">
+        <ol className="space-y-4 [perspective:1000px]">
           {STEPS.map((step, index) => {
             const isDone = allStepsDone || currentStep > index;
             const isCurrent = stage === "working" && currentStep === index;
             return (
               <li
                 key={step.id}
+                data-layer={step.id}
                 className={`flex gap-4 transition-opacity duration-300 ${
                   isDone && !isCurrent ? "opacity-55" : "opacity-100"
                 }`}

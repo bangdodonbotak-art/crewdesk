@@ -47,22 +47,29 @@ export default function Reveal({
         const items = el.querySelectorAll("[data-reveal-child]");
         if (items.length > 0) {
           gsap.from(items, {
-            opacity: 0,
+            // F-4: start at opacity 0.35, not 0 — the old fade left text
+            // (e.g. pricing "$0") nearly unreadable during the reveal.
+            // clearProps restores the natural state on complete, so CSS
+            // :hover transforms (pricing card lift) work again — the
+            // inline transform left by gsap.from was overriding them.
+            opacity: 0.35,
             y: 16,
             duration: 0.6,
             ease: "power2.out",
             stagger,
+            clearProps: "transform,opacity",
             scrollTrigger: { trigger: el, start, once: true },
           });
         }
         return;
       }
       gsap.from(el, {
-        opacity: 0,
+        opacity: 0.35,
         y: 12,
         duration: 0.7,
         delay,
         ease: "power2.out",
+        clearProps: "transform,opacity",
         scrollTrigger: { trigger: el, start, once: true },
       });
     }, el);

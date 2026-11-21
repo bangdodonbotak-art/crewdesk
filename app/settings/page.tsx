@@ -182,9 +182,15 @@ export default function SettingsPage() {
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
-        ← Back to Inbox
-      </Link>
+      <div className="flex flex-wrap items-center gap-5">
+        <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
+          ← Back to Inbox
+        </Link>
+        {/* F-5: the Knowledge base had no link from anywhere. */}
+        <Link href="/knowledge" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
+          Knowledge base
+        </Link>
+      </div>
       <h1 className="mt-4 text-3xl font-semibold">Settings</h1>
       <p className="mt-1 text-sm text-muted">
         Plan, quota, inbound email, and data consent. Nothing here is sent
