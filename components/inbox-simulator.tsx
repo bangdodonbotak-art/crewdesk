@@ -1,17 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { DEMO_NOTICE, PLANS } from "@/lib/site-data";
-import CrewTimeline, { type CrewStep } from "./crew-timeline";
 
 /**
  * InboxSimulator — the landing page's single interactive moment (DEMO).
  * Type or pick a sample customer message, watch the crew work through
  * Triage → Reply → Approve, then Approve, Edit, or Reject the draft.
  * Nothing here sends a real message. Everything is labelled DEMO.
+ *
+ * Auto-play: on mount (no-preference only) it runs ONE ambient cycle
+ * Triage → Reply → Approve (~2.75s per step, typing indicator + progress
+ * bar), then stops at the review state with a Replay button. It never
+ * loops. Pause button (≥44px) + pause on hover/focus. Any manual
+ * interaction stops auto-play. In prefers-reduced-motion it shows a
+ * static review frame + manual controls only.
  */
 
-const STEPS: CrewStep[] = [
+export interface CrewStep {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export const STEPS: CrewStep[] = [
   {
     id: "triage",
     label: "Triage",
@@ -72,6 +84,8 @@ const EXAMPLES: Example[] = [
 
 type Stage = "idle" | "working" | "review" | "editing" | "sent" | "rejected";
 
+const STEP_MS = 2750;
+
 export default function InboxSimulator() {
   const [exampleId, setExampleId] = useState<string>(EXAMPLES[0].id);
   const [customerMessage, setCustomerMessage] = useState<string>(
@@ -80,18 +94,59 @@ export default function InboxSimulator() {
   const [draft, setDraft] = useState<string>(EXAMPLES[0].draft);
   const [stage, setStage] = useState<Stage>("idle");
   const [currentStep, setCurrentStep] = useState<number>(-1);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [running, setRunning] = useState(false);
+  const [isAuto, setIsAuto] = useState(false);
+  const [autoDone, setAutoDone] = useState(false);
+  const [manualPaused, setManualPaused] = useState(false);
+  const [hoverPaused, setHoverPaused] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const paused = manualPaused || hoverPaused;
 
+  // Mount: one ambient auto-play cycle — or a static review frame when the
+  // user prefers reduced motion.
   useEffect(() => {
-    const pending = timers.current;
-    return () => {
-      pending.forEach((t) => clearTimeout(t));
-    };
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (mq.matches) {
+      setReducedMotion(true);
+      setStage("review");
+      setCurrentStep(STEPS.length - 1);
+      return;
+    }
+    setStage("working");
+    setCurrentStep(0);
+    setRunning(true);
+    setIsAuto(true);
   }, []);
 
+  // Step engine: advance one step per STEP_MS while a run is in progress
+  // and not paused. Finishing the last step lands on review and stops —
+  // auto-play never loops.
+  useEffect(() => {
+    if (!running || paused || stage !== "working") return;
+    const timer = setTimeout(() => {
+      if (currentStep < STEPS.length - 1) {
+        setCurrentStep((s) => s + 1);
+      } else {
+        setStage("review");
+        setRunning(false);
+        if (isAuto) {
+          setAutoDone(true);
+          setIsAuto(false);
+        }
+      }
+    }, STEP_MS);
+    return () => clearTimeout(timer);
+  }, [running, paused, currentStep, stage, isAuto]);
+
+  const stopAmbient = () => {
+    setRunning(false);
+    setIsAuto(false);
+    setAutoDone(false);
+    setManualPaused(false);
+  };
+
   const pickExample = (example: Example) => {
-    timers.current.forEach((t) => clearTimeout(t));
-    timers.current = [];
+    stopAmbient();
     setExampleId(example.id);
     setCustomerMessage(example.customerMessage);
     setDraft(example.draft);
@@ -101,22 +156,23 @@ export default function InboxSimulator() {
 
   const runCrew = () => {
     if (customerMessage.trim().length === 0) return;
-    timers.current.forEach((t) => clearTimeout(t));
-    timers.current = [];
+    stopAmbient();
     setStage("working");
     setCurrentStep(0);
-    // Simple sequential reveal: opacity/transform only, via CrewTimeline
-    // state + the step panels below. Timers are cleared on unmount/reset.
-    timers.current = [
-      setTimeout(() => setCurrentStep(1), 900),
-      setTimeout(() => setCurrentStep(2), 1800),
-      setTimeout(() => setStage("review"), 2600),
-    ];
+    setRunning(true);
+  };
+
+  const replay = () => {
+    setAutoDone(false);
+    setManualPaused(false);
+    setStage("working");
+    setCurrentStep(0);
+    setRunning(true);
+    setIsAuto(true);
   };
 
   const reset = () => {
-    timers.current.forEach((t) => clearTimeout(t));
-    timers.current = [];
+    stopAmbient();
     setStage("idle");
     setCurrentStep(-1);
   };
@@ -136,30 +192,72 @@ export default function InboxSimulator() {
 
   const statusClass =
     stage === "sent"
-      ? "border-green bg-green/10 text-green"
+      ? "border-approve bg-approve/10 text-approve"
       : stage === "rejected"
-        ? "border-red bg-red/10 text-red"
+        ? "border-reject bg-reject/10 text-reject"
         : "border-amber bg-amber/10 text-amber";
 
+  const allStepsDone =
+    stage === "review" ||
+    stage === "editing" ||
+    stage === "sent" ||
+    stage === "rejected";
+
+  const progress =
+    stage === "idle"
+      ? 0
+      : stage === "working"
+        ? (currentStep + 1) / STEPS.length
+        : 1;
+
   return (
-    <div className="rounded-2xl border border-line bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent">
-            Try it — interactive demo
-          </p>
-          <h3 className="mt-2 font-display text-2xl font-semibold">
-            Watch the crew handle one message
-          </h3>
-        </div>
-        <span className="rounded-full border border-line bg-paper px-3 py-1 text-xs font-medium text-muted">
+    <div
+      className="rounded-xl border border-line bg-panel p-5 shadow-sm sm:p-6"
+      onMouseEnter={() => setHoverPaused(true)}
+      onMouseLeave={() => setHoverPaused(false)}
+      onFocus={() => setHoverPaused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+          setHoverPaused(false);
+        }
+      }}
+    >
+      {/* Terminal header bar */}
+      <div className="flex items-center justify-between gap-3 border-b border-line pb-4">
+        <p className="truncate font-mono text-xs text-muted">
+          crewdesk — live demo
+        </p>
+        <span className="flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-xs font-medium text-accent">
+          <span
+            aria-hidden="true"
+            className="h-2 w-2 animate-pulse rounded-full bg-accent"
+          />
+          LIVE
+        </span>
+      </div>
+      {/* Progress bar — scaleX from the left, no layout animation */}
+      <div
+        className="mt-4 h-0.5 overflow-hidden rounded-full bg-panel-3"
+        aria-hidden="true"
+      >
+        <div
+          className="h-full w-full origin-left bg-accent transition-transform duration-500 ease-out"
+          style={{ transform: `scaleX(${progress})` }}
+        />
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
+        <h3 className="text-balance font-display text-2xl font-semibold">
+          Watch the crew handle one message
+        </h3>
+        <span className="whitespace-nowrap rounded-full border border-line bg-panel-2 px-3 py-1 text-xs font-medium text-muted">
           {DEMO_NOTICE}
         </span>
       </div>
 
       {/* Example picker */}
       <div className="mt-5">
-        <p className="text-sm font-medium text-ink">Pick a sample message:</p>
+        <p className="text-sm font-medium text-paper">Pick a sample message:</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {EXAMPLES.map((example) => (
             <button
@@ -167,10 +265,10 @@ export default function InboxSimulator() {
               type="button"
               onClick={() => pickExample(example)}
               aria-pressed={exampleId === example.id}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-3.5 text-sm font-medium transition-colors ${
                 exampleId === example.id
-                  ? "border-accent bg-accent text-white"
-                  : "border-line bg-paper text-ink hover:border-accent"
+                  ? "border-accent bg-accent/10 text-accent"
+                  : "border-line bg-panel-2 text-paper hover:border-accent"
               }`}
             >
               {example.label}
@@ -182,7 +280,7 @@ export default function InboxSimulator() {
       {/* Customer message */}
       <label
         htmlFor="demo-customer-message"
-        className="mt-5 block text-sm font-medium text-ink"
+        className="mt-5 block text-sm font-medium text-paper"
       >
         Customer message (demo)
       </label>
@@ -195,7 +293,7 @@ export default function InboxSimulator() {
           if (stage !== "idle") reset();
         }}
         rows={3}
-        className="mt-2 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm leading-relaxed text-ink outline-none focus:border-accent"
+        className="mt-2 w-full rounded-xl border border-line bg-panel-2 px-3 py-2 text-sm leading-relaxed text-paper outline-none focus:border-accent"
       />
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -203,10 +301,29 @@ export default function InboxSimulator() {
           type="button"
           onClick={runCrew}
           disabled={stage === "working" || customerMessage.trim().length === 0}
-          className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-5 text-sm font-semibold text-void transition-opacity disabled:opacity-50"
         >
           {stage === "working" ? "Crew working…" : "Let the crew work"}
         </button>
+        {running && !reducedMotion && (
+          <button
+            type="button"
+            onClick={() => setManualPaused((p) => !p)}
+            aria-pressed={manualPaused}
+            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper"
+          >
+            {manualPaused ? "Resume" : "Pause"}
+          </button>
+        )}
+        {autoDone && stage === "review" && !reducedMotion && (
+          <button
+            type="button"
+            onClick={replay}
+            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper"
+          >
+            Replay
+          </button>
+        )}
         {(stage === "review" ||
           stage === "editing" ||
           stage === "sent" ||
@@ -214,38 +331,78 @@ export default function InboxSimulator() {
           <button
             type="button"
             onClick={reset}
-            className="rounded-full border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink"
+            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper"
           >
             Try another message
           </button>
         )}
         <span
           aria-live="polite"
-          className={`rounded-full border px-3 py-1 text-xs font-medium ${statusClass}`}
+          className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium ${statusClass}`}
         >
           {statusLabel}
         </span>
       </div>
 
-      {/* Crew steps — revealed in sequence */}
-      {(stage === "working" || stage === "review" || stage === "editing" || stage === "sent" || stage === "rejected") && (
-        <div className="mt-6 border-t border-line pt-6">
-          <CrewTimeline
-            steps={STEPS}
-            currentStep={stage === "sent" || stage === "rejected" ? 2 : currentStep}
-          />
-          <p className="mt-2 text-xs text-muted">
-            {stage === "working"
-              ? "Demo: the crew is working through each step."
+      {/* Crew steps — fixed min-height, no layout shift when steps change */}
+      <div className="mt-6 min-h-[240px] border-t border-line pt-6 sm:min-h-[216px]">
+        <ol className="space-y-4">
+          {STEPS.map((step, index) => {
+            const isDone = allStepsDone || currentStep > index;
+            const isCurrent = stage === "working" && currentStep === index;
+            return (
+              <li key={step.id} className="flex gap-4">
+                <span
+                  aria-hidden="true"
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-mono text-sm font-medium ${
+                    isDone
+                      ? "border-approve bg-approve/10 text-approve"
+                      : isCurrent
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-line bg-panel-2 text-meta"
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <p
+                    className={`flex items-center gap-2 font-display text-lg font-semibold ${
+                      isCurrent || isDone ? "text-paper" : "text-muted"
+                    }`}
+                  >
+                    {step.label}
+                    {isCurrent && (
+                      <span
+                        className="flex gap-1"
+                        aria-hidden="true"
+                      >
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent [animation-delay:150ms]" />
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent [animation-delay:300ms]" />
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted">
+                    {step.description}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="mt-4 text-xs text-meta">
+          {stage === "working"
+            ? "Demo: the crew is working through each step."
+            : stage === "idle"
+              ? " "
               : "Demo: all three steps are complete. The draft below is waiting for you."}
-          </p>
-        </div>
-      )}
+        </p>
+      </div>
 
       {/* Draft + decision */}
       {(stage === "review" || stage === "editing") && (
-        <div className="mt-6 rounded-xl border border-line bg-paper p-4">
-          <p className="text-sm font-medium text-ink">
+        <div className="mt-6 rounded-xl border border-line bg-panel-2 p-4">
+          <p className="text-sm font-medium text-paper">
             Draft reply (demo — not sent yet)
           </p>
           {stage === "editing" ? (
@@ -254,17 +411,20 @@ export default function InboxSimulator() {
               onChange={(event) => setDraft(event.target.value)}
               rows={5}
               aria-label="Edit draft reply (demo)"
-              className="mt-2 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm leading-relaxed text-ink outline-none focus:border-accent"
+              className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2 text-sm leading-relaxed text-paper outline-none focus:border-accent"
             />
           ) : (
-            <p className="mt-2 text-sm leading-relaxed text-ink">{draft}</p>
+            <p className="mt-2 text-sm leading-relaxed text-paper">{draft}</p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             {stage === "editing" ? (
               <button
                 type="button"
-                onClick={() => setStage("review")}
-                className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white"
+                onClick={() => {
+                  stopAmbient();
+                  setStage("review");
+                }}
+                className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-4 text-sm font-semibold text-void"
               >
                 Save edit
               </button>
@@ -272,22 +432,31 @@ export default function InboxSimulator() {
               <>
                 <button
                   type="button"
-                  onClick={() => setStage("sent")}
-                  className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => {
+                    stopAmbient();
+                    setStage("sent");
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-4 text-sm font-semibold text-void"
                 >
                   Approve
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStage("editing")}
-                  className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink"
+                  onClick={() => {
+                    stopAmbient();
+                    setStage("editing");
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper"
                 >
                   Edit
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStage("rejected")}
-                  className="rounded-full border border-red/40 bg-white px-4 py-2 text-sm font-medium text-red"
+                  onClick={() => {
+                    stopAmbient();
+                    setStage("rejected");
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-reject/40 bg-panel px-4 text-sm font-medium text-reject"
                 >
                   Reject
                 </button>
@@ -304,10 +473,10 @@ export default function InboxSimulator() {
       {stage === "sent" && (
         <div
           aria-live="polite"
-          className="mt-6 rounded-xl border border-green/40 bg-green/10 p-4"
+          className="mt-6 rounded-xl border border-approve/40 bg-approve/10 p-4"
         >
-          <p className="font-medium text-green">Sent (demo)</p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">{draft}</p>
+          <p className="font-medium text-approve">Sent (demo)</p>
+          <p className="mt-1 text-sm leading-relaxed text-paper">{draft}</p>
           <p className="mt-2 text-xs text-muted">
             {DEMO_NOTICE} — in the real product this reply would now go to the
             customer, and it would count as 1 sent reply against your daily
@@ -319,10 +488,10 @@ export default function InboxSimulator() {
       {stage === "rejected" && (
         <div
           aria-live="polite"
-          className="mt-6 rounded-xl border border-red/40 bg-red/10 p-4"
+          className="mt-6 rounded-xl border border-reject/40 bg-reject/10 p-4"
         >
-          <p className="font-medium text-red">Rejected (demo)</p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">
+          <p className="font-medium text-reject">Rejected (demo)</p>
+          <p className="mt-1 text-sm leading-relaxed text-paper">
             This draft was rejected. Nothing was sent, and no quota was used —
             quota counts only per reply actually sent.
           </p>

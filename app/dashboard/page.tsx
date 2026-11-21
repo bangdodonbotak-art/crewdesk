@@ -35,7 +35,7 @@ function ageText(createdAt: string): string {
 function priorityClass(priority: Thread["priority"]): string {
   switch (priority) {
     case "P0":
-      return "border-red text-red";
+      return "border-reject text-reject";
     case "P1":
       return "border-amber text-amber";
     case "P2":
@@ -65,9 +65,9 @@ export default function DashboardPage() {
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-5">
         <div>
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted">
-            <img src="/logo.png" alt="CrewDesk logo" className="h-5 w-5 rounded" />
-            <Link href="/" className="hover:text-accent">
+          <p className="flex items-center gap-2 text-xs font-semibold text-muted">
+            <img src="/logo-96.png" alt="CrewDesk logo" className="h-5 w-5 rounded" />
+            <Link href="/" className="inline-flex min-h-11 items-center hover:text-accent">
               CrewDesk
             </Link>
             {" · Support Crew"}
@@ -78,7 +78,7 @@ export default function DashboardPage() {
             shown here.
           </p>
         </div>
-        <div className="rounded-md border border-line bg-white px-3 py-2 text-right">
+        <div className="rounded-md border border-line bg-panel px-3 py-2 text-right">
           <p className="text-xs text-muted">Free plan quota</p>
           <p className="text-lg font-semibold leading-tight">
             {DEMO_QUOTA.used} / {DEMO_QUOTA.limit}
@@ -93,10 +93,10 @@ export default function DashboardPage() {
           role="tab"
           aria-selected={tab === "live"}
           onClick={() => setTab("live")}
-          className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
+          className={`inline-flex min-h-11 items-center rounded-full border px-4 py-1.5 text-sm font-medium ${
             tab === "live"
-              ? "border-accent bg-accent text-white"
-              : "border-line bg-white text-ink hover:border-accent"
+              ? "border-cta bg-cta text-void"
+              : "border-line bg-panel text-paper hover:border-accent"
           }`}
         >
           Live
@@ -106,10 +106,10 @@ export default function DashboardPage() {
           role="tab"
           aria-selected={tab === "demo"}
           onClick={() => setTab("demo")}
-          className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
+          className={`inline-flex min-h-11 items-center rounded-full border px-4 py-1.5 text-sm font-medium ${
             tab === "demo"
-              ? "border-accent bg-accent text-white"
-              : "border-line bg-white text-ink hover:border-accent"
+              ? "border-cta bg-cta text-void"
+              : "border-line bg-panel text-paper hover:border-accent"
           }`}
         >
           Demo ({DEMO_THREADS.length})
@@ -117,7 +117,7 @@ export default function DashboardPage() {
       </div>
 
       {tab === "live" ? (
-        <section className="mt-6 rounded-lg border border-line bg-white p-6">
+        <section className="mt-6 rounded-lg border border-line bg-panel p-6">
           <h2 className="text-xl font-semibold">No real threads yet</h2>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
             No real threads yet — connect Gmail or forward email to your
@@ -126,7 +126,7 @@ export default function DashboardPage() {
           </p>
           <Link
             href="/settings"
-            className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="mt-4 inline-flex min-h-11 items-center rounded-md bg-cta px-4 py-2 text-sm font-medium text-void hover:opacity-90"
           >
             Go to Settings
           </Link>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
                 onChange={(e) =>
                   setCategory(e.target.value as CategoryFilter)
                 }
-                className="rounded-md border border-line bg-white px-2 py-1.5 text-sm"
+                className="rounded-md border border-line bg-panel min-h-11 px-2 py-1.5 text-sm"
               >
                 <option value="all">All categories</option>
                 {CATEGORIES.map((c) => (
@@ -158,7 +158,7 @@ export default function DashboardPage() {
                 onChange={(e) =>
                   setPriority(e.target.value as PriorityFilter)
                 }
-                className="rounded-md border border-line bg-white px-2 py-1.5 text-sm"
+                className="rounded-md border border-line bg-panel min-h-11 px-2 py-1.5 text-sm"
               >
                 <option value="all">All priorities</option>
                 {PRIORITIES.map((p) => (
@@ -174,20 +174,20 @@ export default function DashboardPage() {
           </div>
 
           {filtered.length === 0 ? (
-            <p className="mt-6 rounded-lg border border-line bg-white p-6 text-sm text-muted">
+            <p className="mt-6 rounded-lg border border-line bg-panel p-6 text-sm text-muted">
               No demo threads match these filters.
             </p>
           ) : (
-            <ul className="mt-4 divide-y divide-line overflow-hidden rounded-lg border border-line bg-white">
+            <ul className="mt-4 divide-y divide-line overflow-hidden rounded-lg border border-line bg-panel">
               {filtered.map((thread) => (
                 <li key={thread.id}>
                   <Link
                     href={`/inbox/${thread.id}`}
-                    className="block px-4 py-4 hover:bg-paper"
+                    className="block px-4 py-4 hover:bg-panel-3"
                   >
                     <span className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`rounded-full border bg-paper px-2 py-0.5 text-xs font-semibold ${priorityClass(thread.priority)}`}
+                        className={`rounded-full border bg-panel-2 px-2 py-0.5 text-xs font-semibold ${priorityClass(thread.priority)}`}
                       >
                         {thread.priority}
                       </span>

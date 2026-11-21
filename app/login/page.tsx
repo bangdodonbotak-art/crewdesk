@@ -10,9 +10,9 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto max-w-md px-4 py-16 sm:px-6">
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted">
-        <img src="/logo.png" alt="CrewDesk logo" className="h-5 w-5 rounded" />
-        <Link href="/" className="hover:text-accent">
+      <p className="flex items-center gap-2 text-xs font-semibold text-muted">
+        <img src="/logo-96.png" alt="CrewDesk logo" className="h-5 w-5 rounded" />
+        <Link href="/" className="inline-flex min-h-11 items-center hover:text-accent">
           CrewDesk
         </Link>
         {" · Support Crew"}
@@ -25,7 +25,7 @@ export default async function LoginPage({
       {showNotConfigured && (
         <div
           role="alert"
-          className="mt-4 rounded-md border border-amber bg-white px-4 py-3 text-sm"
+          className="mt-4 rounded-md border border-amber bg-panel px-4 py-3 text-sm"
         >
           Supabase is not configured yet — Google sign-in is unavailable.
           Explore the demo instead.
@@ -34,17 +34,17 @@ export default async function LoginPage({
       {error === "auth_failed" && (
         <div
           role="alert"
-          className="mt-4 rounded-md border border-red bg-white px-4 py-3 text-sm"
+          className="mt-4 rounded-md border border-reject bg-panel px-4 py-3 text-sm"
         >
           Sign-in failed. Please try again or explore the demo.
         </div>
       )}
 
-      <div className="mt-6 rounded-lg border border-line bg-white p-6">
+      <div className="mt-6 rounded-lg border border-line bg-panel p-6">
         <button
           type="button"
           disabled
-          className="w-full cursor-not-allowed rounded-md border border-line bg-paper px-4 py-2.5 text-sm font-medium text-muted opacity-60"
+          className="w-full min-h-11 cursor-not-allowed rounded-md border border-line bg-panel-2 px-4 py-2.5 text-sm font-medium text-muted opacity-60"
         >
           Continue with Google
         </button>
@@ -55,7 +55,7 @@ export default async function LoginPage({
           <p className="text-sm text-muted">Or explore the demo dashboard:</p>
           <Link
             href="/dashboard"
-            className="mt-2 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="mt-2 inline-flex min-h-11 items-center rounded-md bg-cta px-4 py-2 text-sm font-medium text-void hover:opacity-90"
           >
             Explore the demo dashboard
           </Link>

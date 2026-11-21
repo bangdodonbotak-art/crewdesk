@@ -43,7 +43,7 @@ export default function InboxDetailPage({
   if (!thread) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        <Link href="/dashboard" className="text-sm text-accent hover:underline">
+        <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
           ← Back to Inbox
         </Link>
         <h1 className="mt-4 text-3xl font-semibold">Thread not found (demo)</h1>
@@ -74,17 +74,17 @@ export default function InboxDetailPage({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <Link href="/dashboard" className="text-sm text-accent hover:underline">
+      <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
         ← Back to Inbox
       </Link>
-      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-muted">
+      <p className="mt-4 text-xs font-semibold text-muted">
         Demo data — not real customers
       </p>
 
       {isEscalated && (
         <div
           role="alert"
-          className="mt-3 rounded-md border border-amber bg-white px-4 py-3 text-sm font-medium text-amber"
+          className="mt-3 rounded-md border border-amber bg-panel px-4 py-3 text-sm font-medium text-amber"
         >
           Escalated to founder — this thread needs a human decision before any
           reply is sent.
@@ -110,7 +110,7 @@ export default function InboxDetailPage({
         <span className="text-muted">From: {thread.from}</span>
       </div>
 
-      <section className="mt-6 rounded-lg border border-line bg-white p-5">
+      <section className="mt-6 rounded-lg border border-line bg-panel p-5">
         <h2 className="text-lg font-semibold">Message</h2>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
           {thread.body}
@@ -120,7 +120,7 @@ export default function InboxDetailPage({
         </p>
       </section>
 
-      <section className="mt-6 rounded-lg border border-line bg-white p-5">
+      <section className="mt-6 rounded-lg border border-line bg-panel p-5">
         <h2 className="text-lg font-semibold">Crew workflow</h2>
         <ol className="mt-3 space-y-2">
           {STEP_LABELS.map((label, i) => {
@@ -141,11 +141,11 @@ export default function InboxDetailPage({
                   aria-hidden
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
                     state === "Done"
-                      ? "border-green bg-green text-white"
+                      ? "border-approve bg-approve text-void"
                       : state === "In progress"
-                        ? "border-accent bg-accent text-white"
+                        ? "border-accent bg-accent text-void"
                         : state === "Escalated"
-                          ? "border-amber bg-amber text-white"
+                          ? "border-amber bg-amber text-void"
                           : "border-line text-muted"
                   }`}
                 >
@@ -162,7 +162,7 @@ export default function InboxDetailPage({
         </p>
       </section>
 
-      <section className="mt-6 rounded-lg border border-line bg-white p-5">
+      <section className="mt-6 rounded-lg border border-line bg-panel p-5">
         <h2 className="text-lg font-semibold">Draft reply</h2>
         <p className="mt-1 text-xs text-muted">
           Demo draft — edit it below. Nothing is sent until you approve, and
@@ -176,14 +176,14 @@ export default function InboxDetailPage({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={8}
-          className="mt-3 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm leading-relaxed"
+          className="mt-3 w-full rounded-md border border-line bg-panel-2 px-3 py-2 text-sm leading-relaxed"
         />
         <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={handleApprove}
             disabled={isSent}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md min-h-11 bg-cta px-4 py-2 text-sm font-medium text-void hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Approve
           </button>
@@ -191,13 +191,13 @@ export default function InboxDetailPage({
             type="button"
             onClick={handleReject}
             disabled={isSent}
-            className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md min-h-11 border border-line bg-panel px-4 py-2 text-sm font-medium hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             Reject
           </button>
         </div>
         {notice && (
-          <p role="status" className="mt-3 text-sm font-medium text-green">
+          <p role="status" className="mt-3 text-sm font-medium text-approve">
             {notice}
           </p>
         )}

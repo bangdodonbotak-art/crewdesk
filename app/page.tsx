@@ -1,12 +1,18 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { DEMO_NOTICE, FAQ, FREE_DAILY_LIMIT, HERO, PLANS, SITE } from "@/lib/site-data";
-import InboxSimulator from "@/components/inbox-simulator";
-import CrewTimeline from "@/components/crew-timeline";
+import InboxSimulator, { STEPS } from "@/components/inbox-simulator";
+import Reveal from "@/components/reveal";
 
 /**
  * CrewDesk landing page.
  * Scroll unit: one founder's workday — morning inbox pile-up → midday the
  * crew works → afternoon the founder approves → night an empty inbox.
- * One <h1> (hero). Prices come only from lib/site-data.ts.
+ * One h1 (hero). Prices come only from lib/site-data.ts.
+ * The inbox simulator lives inside the hero. The old static timeline
+ * component was removed (pure duplicate of the simulator) — see
+ * REVISION-PROMPT §5 item 7.
  */
 
 const DAY: { time: string; title: string; body: string }[] = [
@@ -47,36 +53,84 @@ const COMPARISON: { name: string; note: string }[] = [
   },
 ];
 
+/** H1 split from the blueprint headline (words unchanged): first clause at
+ * full display size, the rest at ~40% in muted. */
+const H1_SPLIT = HERO.headline.indexOf(". ");
+const H1_FIRST = HERO.headline.slice(0, H1_SPLIT + 1);
+const H1_REST = HERO.headline.slice(H1_SPLIT + 2);
+
+/** Sticky mobile CTA — appears only after the hero scrolls out of view. */
+function StickyMobileCta() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const hero = document.getElementById("hero");
+    if (!hero) return;
+    const observer = new IntersectionObserver(
+      (entries) => setVisible(!entries[0].isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      aria-hidden={!visible}
+      className={`fixed inset-x-0 bottom-0 z-30 border-t border-line bg-void/95 backdrop-blur transition-transform duration-300 md:hidden ${
+        visible ? "translate-y-0" : "invisible translate-y-full"
+      }`}
+    >
+      <div className="flex items-center gap-3 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+        <a
+          href="#pricing"
+          tabIndex={visible ? 0 : -1}
+          className="flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-full bg-cta px-4 text-sm font-semibold text-void"
+        >
+          {HERO.cta}
+        </a>
+        <a
+          href="#pricing"
+          tabIndex={visible ? 0 : -1}
+          className="flex min-h-11 items-center whitespace-nowrap px-2 text-sm font-medium text-paper"
+        >
+          Pricing
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="min-h-screen bg-void text-paper">
       {/* Pill nav */}
-      <header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-line bg-void/95 backdrop-blur">
         <nav
           aria-label="Main"
           className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6"
         >
           <a
             href="#top"
-            className="flex items-center gap-2 font-display text-xl font-bold tracking-tight"
+            className="flex min-h-11 items-center gap-2 whitespace-nowrap font-display text-xl font-bold tracking-tight"
           >
-            <img src="/logo.png" alt="CrewDesk logo" className="h-8 w-8 rounded-lg" />
+            <img src="/logo-96.png" alt="CrewDesk logo" className="h-8 w-8 rounded-md" />
             {SITE.name}
           </a>
-          <div className="hidden items-center gap-1 rounded-full border border-line bg-white px-2 py-1 text-sm sm:flex">
-            <a href="#product" className="rounded-full px-3 py-1.5 hover:bg-paper">
+          <div className="hidden items-center gap-1 rounded-full border border-line bg-panel px-2 py-1 text-sm sm:flex">
+            <a href="#product" className="flex min-h-11 items-center whitespace-nowrap rounded-full px-3 hover:bg-panel-2">
               Product
             </a>
-            <a href="#pricing" className="rounded-full px-3 py-1.5 hover:bg-paper">
+            <a href="#pricing" className="flex min-h-11 items-center whitespace-nowrap rounded-full px-3 hover:bg-panel-2">
               Pricing
             </a>
-            <a href="#faq" className="rounded-full px-3 py-1.5 hover:bg-paper">
+            <a href="#faq" className="flex min-h-11 items-center whitespace-nowrap rounded-full px-3 hover:bg-panel-2">
               FAQ
             </a>
           </div>
           <a
             href="#pricing"
-            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white"
+            className="flex min-h-11 items-center whitespace-nowrap rounded-full border border-transparent bg-cta px-4 text-sm font-semibold text-void hover:border-accent"
           >
             Start free
           </a>
@@ -84,57 +138,72 @@ export default function LandingPage() {
       </header>
 
       <main id="top">
-        {/* Hero — cinematic full-bleed, left-aligned, one CTA */}
-        <section className="bg-ink text-paper">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-paper/70">
-              {SITE.tagline} Support Crew for solo founders
-            </p>
-            <h1 className="mt-6 max-w-3xl font-display text-5xl font-bold leading-[1.02] sm:text-7xl">
-              {HERO.headline}
+        {/* Hero — void canvas, one glow, simulator inside */}
+        <section id="hero" className="hero-glow hero-grid relative bg-void text-paper">
+          <div className="relative mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-24">
+            <h1 className="max-w-3xl text-balance font-display text-[clamp(2.5rem,7vw,4.5rem)] font-bold leading-[1.0] tracking-[-0.02em] text-paper">
+              <span className="block">{H1_FIRST}</span>
+              <span className="mt-3 block text-[0.42em] font-semibold leading-[1.2] tracking-[-0.01em] text-muted sm:mt-4">
+                {H1_REST}
+              </span>
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-paper/80">
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted">
               {HERO.subtext}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <a
                 href="#pricing"
-                className="rounded-full bg-accent px-6 py-3.5 text-base font-semibold text-white"
+                className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-6 py-3.5 text-base font-semibold text-void"
               >
                 {HERO.cta}
               </a>
-              <p className="text-sm text-paper/70">
-                Free forever — {FREE_DAILY_LIMIT} replies a day. No card required.
+              <p className="text-sm text-muted">
+                Free forever. No card required.
               </p>
             </div>
-            <p className="mt-10 text-xs uppercase tracking-widest text-paper/50">
-              Triage &nbsp;→&nbsp; Reply &nbsp;→&nbsp; Approve
-            </p>
+            <div className="mt-10 sm:mt-12">
+              <InboxSimulator />
+            </div>
           </div>
         </section>
 
-        {/* Product — the interactive moment */}
-        <section id="product" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
-          <h2 className="font-display text-3xl font-bold sm:text-4xl">
-            One job, done in front of you
+        {/* How it works — 3 numbered rows, copy from the simulator STEPS */}
+        <Reveal>
+        <section id="product" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24 sm:px-6">
+          <h2 className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">
+            How it works
           </h2>
-          <p className="mt-3 max-w-2xl leading-relaxed text-muted">
-            This is the whole product: a message comes in, the crew triages it
-            and drafts a reply, and you approve it. Try it below — every word
-            here is demo data.
-          </p>
-          <div className="mt-8">
-            <InboxSimulator />
-          </div>
-          <div className="mt-8">
-            <CrewTimeline />
-          </div>
+          <ol className="mt-10 space-y-8">
+            {STEPS.map((step, index) => (
+              <li
+                key={step.id}
+                className="flex gap-5 border-t border-line pt-6 first:border-t-0 first:pt-0"
+              >
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 font-mono text-sm font-medium text-accent"
+                >
+                  0{index + 1}
+                </span>
+                <div>
+                  <h3 className="text-balance font-display text-2xl font-semibold">
+                    {step.label}
+                  </h3>
+                  <p className="mt-1 max-w-2xl leading-relaxed text-muted">
+                    {step.description}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
+        </Reveal>
 
         {/* A day with CrewDesk — the scroll unit */}
-        <section className="border-y border-line bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-            <h2 className="font-display text-3xl font-bold sm:text-4xl">
+        <Reveal>
+        <section className="border-y border-line bg-panel">
+          <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
+            <h2 className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">
               A day with CrewDesk
             </h2>
             <p className="mt-3 max-w-2xl leading-relaxed text-muted">
@@ -149,15 +218,15 @@ export default function LandingPage() {
                 >
                   <span
                     aria-hidden="true"
-                    className="absolute -left-[17px] top-0 flex h-8 w-8 items-center justify-center rounded-full border border-accent bg-paper text-sm font-semibold text-accent"
+                    className="absolute -left-[17px] top-0 flex h-8 w-8 items-center justify-center rounded-full border border-accent bg-panel font-mono text-sm font-medium text-accent"
                   >
                     {index + 1}
                   </span>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-accent">
+                    <p className="font-mono text-sm text-accent">
                       {step.time}
                     </p>
-                    <h3 className="mt-1 font-display text-2xl font-semibold">
+                    <h3 className="mt-1 text-balance font-display text-2xl font-semibold">
                       {step.title}
                     </h3>
                     <p className="mt-2 max-w-2xl leading-relaxed text-muted">
@@ -169,18 +238,20 @@ export default function LandingPage() {
             </ol>
           </div>
         </section>
+        </Reveal>
 
         {/* Why not the others — honest, no invented numbers */}
+        <Reveal>
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <h2 className="font-display text-3xl font-bold sm:text-4xl">
+          <h2 className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">
             Why not the others
           </h2>
           <p className="mt-3 max-w-2xl leading-relaxed text-muted">
             Other tools do part of the job. CrewDesk does one job end to end —
             and the free tier is free forever, not a countdown.
           </p>
-          <div className="mt-8 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
-            <div className="grid grid-cols-[1fr_2fr] gap-4 bg-paper px-5 py-3 text-sm font-semibold">
+          <div className="mt-8 divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
+            <div className="grid grid-cols-[1fr_2fr] gap-4 bg-panel-2 px-5 py-3 text-sm font-semibold">
               <span>Tool</span>
               <span>Where it stops</span>
             </div>
@@ -189,15 +260,15 @@ export default function LandingPage() {
                 key={row.name}
                 className="grid grid-cols-[1fr_2fr] gap-4 px-5 py-4"
               >
-                <span className="font-display text-lg font-semibold">
+                <span className="whitespace-nowrap font-display text-lg font-semibold">
                   {row.name}
                 </span>
                 <span className="leading-relaxed text-muted">{row.note}</span>
               </div>
             ))}
-            <div className="grid grid-cols-[1fr_2fr] gap-4 bg-accent/5 px-5 py-4">
-              <span className="font-display text-lg font-semibold text-accent">
-                {SITE.name}
+            <div className="grid grid-cols-[1fr_2fr] gap-4 border border-accent bg-panel-2 px-5 py-4">
+              <span className="whitespace-nowrap font-mono text-sm font-semibold text-accent">
+                CREWDESK
               </span>
               <span className="leading-relaxed">
                 Free forever with {FREE_DAILY_LIMIT} replies a day — triage,
@@ -206,37 +277,50 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+        </Reveal>
 
         {/* Pricing — from PLANS only */}
-        <section id="pricing" className="border-y border-line bg-white">
-          <div className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
-            <h2 className="font-display text-3xl font-bold sm:text-4xl">Pricing</h2>
+        <Reveal>
+        <section id="pricing" className="border-y border-line bg-panel">
+          <div className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24 sm:px-6">
+            <h2 className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">Pricing</h2>
             <p className="mt-3 max-w-2xl leading-relaxed text-muted">
               Start free, upgrade when your inbox grows. Quota counts per reply
               actually sent — drafts and rejections cost nothing.
             </p>
             <div className="mt-10 grid gap-6 md:grid-cols-3">
-              {PLANS.map((plan) => (
+              {PLANS.map((plan) => {
+                const isStarter = plan.id === "starter";
+                // REVISION-PROMPT §5 item 7: shorten the 30-char CTA
+                // "Start free — upgrade when ready" to "Upgrade when ready".
+                const ctaLabel =
+                  plan.id === "starter" ? "Upgrade when ready" : plan.cta;
+                return (
                 <article
                   key={plan.id}
-                  className={`flex flex-col rounded-2xl border p-6 ${
-                    plan.id === "starter"
-                      ? "border-accent bg-paper shadow-sm"
-                      : "border-line bg-paper"
+                  className={`flex flex-col rounded-xl border p-6 ${
+                    isStarter
+                      ? "border-accent bg-panel-2"
+                      : "border-line bg-panel"
                   }`}
                 >
+                  {isStarter && (
+                    <p className="mb-4 whitespace-nowrap font-mono text-xs font-medium text-accent">
+                      MOST POPULAR
+                    </p>
+                  )}
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-display text-2xl font-semibold">
                       {plan.name}
                     </h3>
                     {plan.comingSoon && (
-                      <span className="rounded-full border border-amber bg-amber/10 px-2.5 py-1 text-xs font-semibold text-amber">
+                      <span className="whitespace-nowrap rounded-full border border-amber bg-amber/10 px-2.5 py-1 text-xs font-semibold text-amber">
                         Coming soon
                       </span>
                     )}
                   </div>
                   <p className="mt-4">
-                    <span className="font-display text-5xl font-bold">
+                    <span className="font-display text-[56px] font-bold leading-none tabular-nums">
                       ${plan.monthlyPriceUsd}
                     </span>
                     <span className="text-muted"> / month</span>
@@ -253,20 +337,28 @@ export default function LandingPage() {
                   {plan.comingSoon ? (
                     <a
                       href="#faq"
-                      className="mt-6 rounded-full border border-line bg-white px-5 py-2.5 text-center text-sm font-semibold"
+                      className="mt-6 inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-5 text-sm font-semibold text-paper hover:border-accent"
                     >
-                      {plan.cta}
+                      {ctaLabel}
+                    </a>
+                  ) : isStarter ? (
+                    <a
+                      href="#top"
+                      className="mt-6 inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-5 text-sm font-semibold text-void"
+                    >
+                      {ctaLabel}
                     </a>
                   ) : (
                     <a
-                      href="#product"
-                      className="mt-6 rounded-full bg-accent px-5 py-2.5 text-center text-sm font-semibold text-white"
+                      href="#top"
+                      className="mt-6 inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-5 text-sm font-semibold text-paper hover:border-accent"
                     >
-                      {plan.cta}
+                      {ctaLabel}
                     </a>
                   )}
                 </article>
-              ))}
+                );
+              })}
             </div>
             <p className="mt-6 text-sm text-muted">
               Growth is coming soon — join the waitlist and we will tell you
@@ -274,15 +366,17 @@ export default function LandingPage() {
             </p>
           </div>
         </section>
+        </Reveal>
 
         {/* FAQ */}
+        <Reveal>
         <section id="faq" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
-          <h2 className="font-display text-3xl font-bold sm:text-4xl">FAQ</h2>
+          <h2 className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">FAQ</h2>
           <div className="mt-8 divide-y divide-line border-y border-line">
             {FAQ.map((item) => (
               <details key={item.question} className="group py-5">
-                <summary className="cursor-pointer list-none font-display text-xl font-semibold marker:hidden [&::-webkit-details-marker]:hidden">
-                  <span className="flex items-start justify-between gap-4">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center font-display text-xl font-semibold marker:hidden [&::-webkit-details-marker]:hidden">
+                  <span className="flex w-full items-start justify-between gap-4">
                     {item.question}
                     <span aria-hidden="true" className="text-accent transition-transform group-open:rotate-45">+</span>
                   </span>
@@ -294,38 +388,41 @@ export default function LandingPage() {
             ))}
           </div>
         </section>
+        </Reveal>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-line bg-ink text-paper">
+      <footer className="border-t border-line bg-void text-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="flex items-center gap-2 font-display text-xl font-bold">
-              <img src="/logo.png" alt="CrewDesk logo" className="h-7 w-7 rounded-md" />
+              <img src="/logo-96.png" alt="CrewDesk logo" className="h-7 w-7 rounded-md" />
               {SITE.name}
             </p>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-paper/70">
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">
               {SITE.tagline} It finishes the work, you approve, it ships.
             </p>
           </div>
           <nav aria-label="Footer" className="flex gap-8 text-sm">
-            <a href="#product" className="text-paper/80 hover:text-paper">
+            <a href="#product" className="flex min-h-11 items-center whitespace-nowrap text-muted hover:text-paper">
               Product
             </a>
-            <a href="#pricing" className="text-paper/80 hover:text-paper">
+            <a href="#pricing" className="flex min-h-11 items-center whitespace-nowrap text-muted hover:text-paper">
               Pricing
             </a>
-            <a href="#faq" className="text-paper/80 hover:text-paper">
+            <a href="#faq" className="flex min-h-11 items-center whitespace-nowrap text-muted hover:text-paper">
               FAQ
             </a>
           </nav>
         </div>
-        <div className="border-t border-paper/15">
-          <p className="mx-auto max-w-6xl px-4 py-4 text-xs text-paper/60 sm:px-6">
+        <div className="border-t border-line">
+          <p className="mx-auto max-w-6xl px-4 py-4 text-xs text-meta sm:px-6">
             {DEMO_NOTICE}. © 2026 {SITE.name}.
           </p>
         </div>
       </footer>
+
+      <StickyMobileCta />
     </div>
   );
 }

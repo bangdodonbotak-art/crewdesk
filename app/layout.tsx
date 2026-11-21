@@ -1,24 +1,43 @@
 import type { Metadata } from "next";
+import { PLANS } from "../lib/site-data";
+import MotionProvider from "../components/motion-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CrewDesk — Hire an AI crew for one job",
+  metadataBase: new URL("https://crewdesk-nine.vercel.app"),
+  title: "CrewDesk — Hire an AI crew to run your support inbox",
   description:
-    "CrewDesk is a Support Crew for solo founders: Triage, Reply, Escalate. It finishes the work, you approve, it ships. Free: 5 replies a day, forever.",
+    "CrewDesk triages your support inbox, drafts replies from your knowledge base, and waits for your approval. Free forever — 5 replies a day, no card.",
   openGraph: {
-    title: "CrewDesk — Hire an AI crew for one job",
+    title: "CrewDesk — Hire an AI crew to run your support inbox",
     description:
-      "One crew, one job, finished. Founder approves before anything is sent.",
+      "CrewDesk triages your support inbox, drafts replies from your knowledge base, and waits for your approval. Free forever — 5 replies a day, no card.",
     type: "website",
     images: [{ url: "/logo.png", width: 512, height: 512, alt: "CrewDesk logo" }],
   },
-  icons: { icon: "/logo.png", apple: "/logo.png" },
+  icons: { icon: "/logo-96.png", apple: "/logo.png" },
   twitter: {
     card: "summary_large_image",
-    title: "CrewDesk — Hire an AI crew for one job",
+    title: "CrewDesk — Hire an AI crew to run your support inbox",
     description:
-      "One crew, one job, finished. Founder approves before anything is sent.",
+      "CrewDesk triages your support inbox, drafts replies from your knowledge base, and waits for your approval. Free forever — 5 replies a day, no card.",
   },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "CrewDesk",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  offers: PLANS.filter((p) => p.id === "free" || p.id === "starter").map(
+    (p) => ({
+      "@type": "Offer",
+      name: p.name,
+      price: p.monthlyPriceUsd,
+      priceCurrency: "USD",
+    }),
+  ),
 };
 
 export default function RootLayout({
@@ -36,12 +55,18 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
-        <link rel="icon" href="/logo.png" type="image/png" />
+        <link rel="icon" href="/logo-96.png" type="image/png" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
-      <body>{children}</body>
+      <body>
+        <MotionProvider>{children}</MotionProvider>
+      </body>
     </html>
   );
 }

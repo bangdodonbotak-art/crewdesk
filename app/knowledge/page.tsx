@@ -70,14 +70,14 @@ export default function KnowledgePage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <Link href="/dashboard" className="text-sm text-accent hover:underline">
+      <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
         ← Back to Inbox
       </Link>
       <h1 className="mt-4 text-3xl font-semibold">Knowledge base</h1>
       <p className="mt-1 text-sm text-muted">
         Demo data — not real customers.
       </p>
-      <p className="mt-2 rounded-md border border-line bg-white px-3 py-2 text-sm text-muted">
+      <p className="mt-2 rounded-md border border-line bg-panel px-3 py-2 text-sm text-muted">
         Demo only — stored in browser state. Real KB needs Supabase (not
         connected yet).
       </p>
@@ -89,11 +89,11 @@ export default function KnowledgePage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search questions and answers…"
-          className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+          className="mt-1 w-full min-h-11 rounded-md border border-line bg-panel px-3 py-2 text-sm"
         />
       </label>
 
-      <section className="mt-6 rounded-lg border border-line bg-white p-5">
+      <section className="mt-6 rounded-lg border border-line bg-panel p-5">
         <h2 className="text-lg font-semibold">Add an answer</h2>
         <form onSubmit={handleAdd} className="mt-3 space-y-3">
           <label className="block">
@@ -103,7 +103,7 @@ export default function KnowledgePage() {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="e.g. How do I change my plan?"
-              className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
+              className="mt-1 w-full min-h-11 rounded-md border border-line bg-panel-2 px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
@@ -113,13 +113,13 @@ export default function KnowledgePage() {
               onChange={(e) => setAnswer(e.target.value)}
               rows={3}
               placeholder="Write the answer the crew should use…"
-              className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
+              className="mt-1 w-full min-h-11 rounded-md border border-line bg-panel-2 px-3 py-2 text-sm"
             />
           </label>
           <button
             type="submit"
             disabled={!question.trim() || !answer.trim()}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md min-h-11 bg-cta px-4 py-2 text-sm font-medium text-void hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Add to knowledge base
           </button>
@@ -131,7 +131,7 @@ export default function KnowledgePage() {
           {filtered.length} of {items.length} entries
         </p>
         {filtered.length === 0 ? (
-          <p className="mt-3 rounded-lg border border-line bg-white p-6 text-sm text-muted">
+          <p className="mt-3 rounded-lg border border-line bg-panel p-6 text-sm text-muted">
             No entries match your search.
           </p>
         ) : (
@@ -139,7 +139,7 @@ export default function KnowledgePage() {
             {filtered.map((item) => (
               <li
                 key={item.id}
-                className="rounded-lg border border-line bg-white p-5"
+                className="rounded-lg border border-line bg-panel p-5"
               >
                 {editingId === item.id ? (
                   <form onSubmit={handleSaveEdit} className="space-y-3">
@@ -149,7 +149,7 @@ export default function KnowledgePage() {
                         type="text"
                         value={editQuestion}
                         onChange={(e) => setEditQuestion(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
+                        className="mt-1 w-full min-h-11 rounded-md border border-line bg-panel-2 px-3 py-2 text-sm"
                       />
                     </label>
                     <label className="block">
@@ -158,20 +158,20 @@ export default function KnowledgePage() {
                         value={editAnswer}
                         onChange={(e) => setEditAnswer(e.target.value)}
                         rows={3}
-                        className="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm"
+                        className="mt-1 w-full min-h-11 rounded-md border border-line bg-panel-2 px-3 py-2 text-sm"
                       />
                     </label>
                     <div className="flex gap-3">
                       <button
                         type="submit"
-                        className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                        className="rounded-md min-h-11 bg-cta px-4 py-2 text-sm font-medium text-void hover:opacity-90"
                       >
                         Save
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingId(null)}
-                        className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:border-accent"
+                        className="rounded-md min-h-11 border border-line bg-panel px-4 py-2 text-sm font-medium hover:border-accent"
                       >
                         Cancel
                       </button>
@@ -192,14 +192,14 @@ export default function KnowledgePage() {
                       <button
                         type="button"
                         onClick={() => startEdit(item)}
-                        className="text-sm font-medium text-accent hover:underline"
+                        className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(item.id)}
-                        className="text-sm font-medium text-red hover:underline"
+                        className="inline-flex min-h-11 items-center text-sm font-medium text-reject hover:underline"
                       >
                         Delete
                       </button>
