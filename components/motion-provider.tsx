@@ -15,7 +15,15 @@ export function useMotion() {
   return useContext(MotionContext);
 }
 
-// Anchor offset has ONE mechanism: `scroll-mt-20` on the target sections.
+// Anchor offset has ONE mechanism: `scroll-mt-20` on zero-height anchor
+// SPANS placed directly above each section heading (not on the sections
+// and not on the headings — the headings sit 64–96px below their section
+// tops behind py-16/py-24, so anchoring the section landed the heading at
+// ~144–193px; anchoring the heading itself overshot by 16px because the
+// heading carries a gsap reveal transform (y:16) while Lenis / the browser
+// measures its rect — live-check 17:23 WIB, verified locally). The span
+// has no transform, so every path (Lenis click, hashchange, cross-page
+// hash scroll, native touch jump) lands the heading at 80px.
 // Lenis `scrollTo` subtracts the target's scroll-margin, and native
 // anchor jumps honour it too. Read the computed scroll-margin and only
 // pass an explicit -80 offset when the engine reports none (Obscura) —
@@ -75,7 +83,7 @@ export default function MotionProvider({ children }: { children: ReactNode }) {
     gsap.ticker.lagSmoothing(0);
 
     // Manual anchor handling (desktop/Lenis path). The offset has ONE
-    // mechanism — `scroll-mt-20` on the target sections — see
+    // mechanism — `scroll-mt-20` on the zero-height anchor spans — see
     // scrollOffsetFor above.
     const onClick = (event: MouseEvent) => {
       const anchor = (event.target as HTMLElement | null)?.closest?.(

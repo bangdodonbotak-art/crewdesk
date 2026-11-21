@@ -42,11 +42,17 @@ Copy `.env.example` to `.env.local` for Supabase keys. Without them the app runs
 
 ## Screenshots
 
-Demo GIF / screenshots: **TODO — not captured yet.** To add one, save a screen recording of the hero simulator as `docs/simulator.gif` and add this line under this section:
+Live demo of the hero inbox simulator (auto-plays Triage → Reply → Approve once, then stops at review):
 
-```markdown
 ![CrewDesk simulator](docs/simulator.gif)
-```
+
+Hero on desktop (1280px):
+
+![CrewDesk hero on desktop](docs/hero.png)
+
+Hero on mobile (375px):
+
+![CrewDesk hero on mobile](docs/mobile.png)
 
 ## What works in this MVP
 

@@ -218,7 +218,8 @@ export default function LandingPage() {
 
         {/* How it works — 3 numbered rows, copy from the simulator STEPS */}
         <Reveal staggerChildren delay={0.1}>
-        <section id="product" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24 sm:px-6">
+        <section className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
+          <span id="product" aria-hidden="true" className="block scroll-mt-20" />
           <h2 data-reveal-child className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">
             How it works
           </h2>
@@ -294,8 +295,9 @@ export default function LandingPage() {
 
         {/* Pricing — from PLANS only */}
         <Reveal staggerChildren delay={0.12}>
-        <section id="pricing" className="scroll-mt-20 border-y border-line bg-panel">
+        <section className="border-y border-line bg-panel">
           <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
+            <span id="pricing" aria-hidden="true" className="block scroll-mt-20" />
             <h2 data-reveal-child className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">Pricing</h2>
             <p data-reveal-child className="mt-3 max-w-2xl leading-relaxed text-muted">
               Start free, upgrade when your inbox grows. Quota counts per reply
@@ -384,7 +386,8 @@ export default function LandingPage() {
 
         {/* FAQ */}
         <Reveal staggerChildren delay={0.06}>
-        <section id="faq" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
+        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <span id="faq" aria-hidden="true" className="block scroll-mt-20" />
           <h2 data-reveal-child className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">FAQ</h2>
           <div className="mt-8 divide-y divide-line border-y border-line">
             {FAQ.map((item) => (
