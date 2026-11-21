@@ -126,3 +126,41 @@ h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Pricing card lift — FIX-REPORT-3D.
+   The Tailwind `pointer-fine:hover:-translate-y-1` utility compiles to a
+   `translate: var(--tw-translate-x) var(--tw-translate-y)` rule whose
+   --tw-translate-y is a calc() value. Obscura does not evaluate a
+   calc()-valued custom property substituted into the `translate`
+   property (proven: computed translate stays "none" on hover), and the
+   live audit measured no lift either (consistent with a too-fast
+   screenshot vs the 200ms transition, or the same mechanism). A plain
+   `transform: translateY(-4px)` rule has no custom-property indirection
+   and is honoured by every engine. transform (not translate) on purpose. */
+@media (hover: hover) and (pointer: fine) {
+  .pricing-card-lift:hover {
+    transform: translateY(-4px);
+  }
+}
+
+/* Sticky simulator — FIX-REPORT-3D (replaces the ScrollTrigger pin).
+   The GSAP pin parked the card at viewport-top ~682px in a 998px
+   viewport (measured 3x, two builds: pin engages ~600px early no
+   matter what — anticipatePin removed, refresh added, same result).
+   A pinned card that low hides the Pause button and the exploding
+   layers below the fold, which is exactly what the live audit saw.
+   CSS sticky is deterministic by construction: the card sticks at
+   exactly 72px, no measurement, no spacer, no Lenis interaction.
+   Both classes are applied ONLY when React's scrub gate passes
+   (desktop fine pointer, >4 cores, no reduced-motion) — the gate
+   lives in app/page.tsx and is passed to the simulator as a prop.
+   Never apply these unconditionally: on mobile / reduced-motion /
+   low-core the card must not stick and the wrapper must not grow. */
+.sim-sticky {
+  position: sticky;
+  top: 72px;
+  z-index: 10;
+}
+.sim-scroll-room {
+  padding-bottom: 160vh;
+}

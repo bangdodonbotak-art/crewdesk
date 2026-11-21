@@ -47,14 +47,15 @@ export default function Reveal({
         const items = el.querySelectorAll("[data-reveal-child]");
         if (items.length > 0) {
           gsap.from(items, {
-            // F-4: start at opacity 0.35, not 0 — the old fade left text
-            // (e.g. pricing "$0") nearly unreadable during the reveal.
-            // clearProps restores the natural state on complete, so CSS
-            // :hover transforms (pricing card lift) work again — the
-            // inline transform left by gsap.from was overriding them.
-            opacity: 0.35,
+            // F-4 / FIX-REPORT-3D: start at opacity 0.6, not 0.35 — the
+            // live audit saw the pricing cards "very dim" mid-scroll
+            // during the fade-in. clearProps restores the natural state
+            // on complete, so CSS :hover transforms (pricing card lift)
+            // work again — the inline transform left by gsap.from was
+            // overriding them.
+            opacity: 0.6,
             y: 16,
-            duration: 0.6,
+            duration: 0.5,
             ease: "power2.out",
             stagger,
             clearProps: "transform,opacity",
@@ -64,9 +65,9 @@ export default function Reveal({
         return;
       }
       gsap.from(el, {
-        opacity: 0.35,
+        opacity: 0.6,
         y: 12,
-        duration: 0.7,
+        duration: 0.5,
         delay,
         ease: "power2.out",
         clearProps: "transform,opacity",

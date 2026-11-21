@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { DEMO_NOTICE, FAQ, HERO, PLANS, SITE } from "@/lib/site-data";
-import InboxSimulator, { STEPS } from "@/components/inbox-simulator";
+import InboxSimulator, { STEPS, type ScrubGate } from "@/components/inbox-simulator";
 import WaitlistForm from "@/components/waitlist-form";
 import Reveal from "@/components/reveal";
 import { useMotion } from "@/components/motion-provider";
@@ -97,6 +97,35 @@ export default function LandingPage() {
   // Day inbox count — the 6 demo threads draining to zero across the
   // workday. Updated by the scrub via ref (no re-render per tick).
   const dayCountRef = useRef<HTMLSpanElement>(null);
+  // Scrub gate — SINGLE source of truth (FIX-REPORT-3D, sticky version).
+  // The simulator's scrub AND the wrapper's scroll-room padding AND the
+  // card's sticky class all read this one value, so the padding exists
+  // BEFORE the scrub measures its trigger range. Gates: desktop fine
+  // pointer ≥1025px, no reduced-motion. NO cores gate: measured 21 Nov
+  // 2026 — scrub active vs static under 4x CPU throttling is identical
+  // (avg frame 49ms vs 51.7ms, p95 91ms vs 139ms, 0 longtasks both);
+  // the scrub is 3 transform/opacity tweens + caption + bg crossfade and
+  // never blocks the main thread. hardwareConcurrency measures
+  // parallelism, but the scrub is single-threaded — a 2-core laptop runs
+  // it fine. A cores cutoff would silently kill the moment on ordinary
+  // machines (the 21 Nov live failure: cloud browser reported ≤4 cores).
+  const [scrubGate, setScrubGate] = useState<ScrubGate>({
+    mode: "static",
+    reason: "init",
+  });
+  useEffect(() => {
+    if (reducedMotion) {
+      setScrubGate({ mode: "static", reason: "reduced-motion" });
+      return;
+    }
+    if (
+      !window.matchMedia("(min-width: 1025px) and (pointer: fine)").matches
+    ) {
+      setScrubGate({ mode: "static", reason: "width-or-pointer" });
+      return;
+    }
+    setScrubGate({ mode: "active", reason: "ok" });
+  }, [reducedMotion]);
 
   // Hero entrance (mount) + the page's only scrub (timeline line).
   // Transform + opacity only; skipped entirely on reduced-motion.
@@ -166,6 +195,10 @@ export default function LandingPage() {
       // (content wrapper is relative), so text contrast never drops.
       // The count is the 6 demo threads draining to zero, labelled as
       // an example workday — not a product promise.
+      // FIX-REPORT-3D: the section background itself crossfades between
+      // four tones in sync with the scrims — scrims alone were invisible
+      // on the near-black panel (live audit). Tones are muted
+      // cyan/neutral/amber/void, no purple gradients.
       gsap
         .timeline({
           scrollTrigger: {
@@ -188,6 +221,10 @@ export default function LandingPage() {
             },
           },
         })
+        .to("#day-section", { backgroundColor: "#0e1a20", duration: 1, ease: "none" }, 0)
+        .to("#day-section", { backgroundColor: "#171a1f", duration: 1, ease: "none" }, 1)
+        .to("#day-section", { backgroundColor: "#211a0e", duration: 1, ease: "none" }, 2)
+        .to("#day-section", { backgroundColor: "#07080a", duration: 1, ease: "none" }, 3)
         .to(".day-scrim-morning", { opacity: 1, duration: 1, ease: "none" }, 0)
         .to(".day-scrim-morning", { opacity: 0, duration: 1, ease: "none" }, 1)
         .to(".day-scrim-midday", { opacity: 1, duration: 1, ease: "none" }, 1)
@@ -259,8 +296,11 @@ export default function LandingPage() {
                 Free forever. No card required.
               </p>
             </div>
-            <div data-hero="sim" className="mt-10 sm:mt-12">
-              <InboxSimulator />
+            <div
+              data-hero="sim"
+              className={`mt-10 sm:mt-12 ${scrubGate.mode === "active" ? "sim-scroll-room" : ""}`}
+            >
+              <InboxSimulator scrubGate={scrubGate} />
             </div>
           </div>
         </section>
@@ -301,12 +341,17 @@ export default function LandingPage() {
 
         {/* A day with CrewDesk — the scroll unit */}
         <Reveal staggerChildren delay={0.12}>
-        <section className="relative overflow-hidden border-y border-line bg-panel">
-          {/* Light-shift scrims (opacity only, behind the content). */}
-          <div aria-hidden="true" className="day-scrim-morning pointer-events-none absolute inset-0 bg-[rgba(0,229,255,0.07)] opacity-0" />
-          <div aria-hidden="true" className="day-scrim-midday pointer-events-none absolute inset-0 bg-[rgba(247,248,248,0.05)] opacity-0" />
-          <div aria-hidden="true" className="day-scrim-afternoon pointer-events-none absolute inset-0 bg-[rgba(255,176,32,0.08)] opacity-0" />
-          <div aria-hidden="true" className="day-scrim-night pointer-events-none absolute inset-0 bg-[rgba(7,8,10,0.5)] opacity-0" />
+        <section id="day-section" className="relative overflow-hidden border-y border-line bg-panel">
+          {/* Light-shift scrims (opacity only, behind the content).
+              FIX-REPORT-3D: the old alphas (0.07/0.05/0.08/0.5) were
+              invisible on the near-black panel — the live audit saw no
+              mood change at all. Stronger tints now, PLUS the section
+              background itself crossfades between four tones (see the
+              scrub timeline below), so the shift reads in screenshots. */}
+          <div aria-hidden="true" className="day-scrim-morning pointer-events-none absolute inset-0 bg-[rgba(0,229,255,0.22)] opacity-0" />
+          <div aria-hidden="true" className="day-scrim-midday pointer-events-none absolute inset-0 bg-[rgba(247,248,248,0.13)] opacity-0" />
+          <div aria-hidden="true" className="day-scrim-afternoon pointer-events-none absolute inset-0 bg-[rgba(255,176,32,0.28)] opacity-0" />
+          <div aria-hidden="true" className="day-scrim-night pointer-events-none absolute inset-0 bg-[rgba(7,8,10,0.6)] opacity-0" />
           <div className="relative mx-auto max-w-6xl px-4 py-24 sm:px-6">
             <h2 data-reveal-child className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">
               A day with CrewDesk
@@ -372,7 +417,7 @@ export default function LandingPage() {
                 <article
                   key={plan.id}
                   data-reveal-child
-                  className={`flex flex-col rounded-xl border p-6 transition-transform duration-200 pointer-fine:hover:-translate-y-1 ${
+                  className={`pricing-card-lift flex flex-col rounded-xl border p-6 transition-transform duration-200 ${
                     isStarter
                       ? "border-accent bg-panel-2"
                       : "border-line bg-panel"
