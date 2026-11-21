@@ -56,7 +56,11 @@ export default function LandingPage() {
           aria-label="Main"
           className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6"
         >
-          <a href="#top" className="font-display text-xl font-bold tracking-tight">
+          <a
+            href="#top"
+            className="flex items-center gap-2 font-display text-xl font-bold tracking-tight"
+          >
+            <img src="/logo.png" alt="CrewDesk logo" className="h-8 w-8 rounded-lg" />
             {SITE.name}
           </a>
           <div className="hidden items-center gap-1 rounded-full border border-line bg-white px-2 py-1 text-sm sm:flex">
@@ -296,7 +300,10 @@ export default function LandingPage() {
       <footer className="border-t border-line bg-ink text-paper">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="font-display text-xl font-bold">{SITE.name}</p>
+            <p className="flex items-center gap-2 font-display text-xl font-bold">
+              <img src="/logo.png" alt="CrewDesk logo" className="h-7 w-7 rounded-md" />
+              {SITE.name}
+            </p>
             <p className="mt-2 max-w-sm text-sm leading-relaxed text-paper/70">
               {SITE.tagline} It finishes the work, you approve, it ships.
             </p>

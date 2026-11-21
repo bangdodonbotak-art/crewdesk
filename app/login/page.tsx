@@ -10,7 +10,8 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto max-w-md px-4 py-16 sm:px-6">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted">
+        <img src="/logo.png" alt="CrewDesk logo" className="h-5 w-5 rounded" />
         <Link href="/" className="hover:text-accent">
           CrewDesk
         </Link>

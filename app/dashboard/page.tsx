@@ -65,7 +65,8 @@ export default function DashboardPage() {
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted">
+            <img src="/logo.png" alt="CrewDesk logo" className="h-5 w-5 rounded" />
             <Link href="/" className="hover:text-accent">
               CrewDesk
             </Link>
