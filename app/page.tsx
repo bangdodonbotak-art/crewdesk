@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEMO_NOTICE, FAQ, FREE_DAILY_LIMIT, HERO, PLANS, SITE } from "@/lib/site-data";
+import { DEMO_NOTICE, FAQ, HERO, PLANS, SITE } from "@/lib/site-data";
 import InboxSimulator, { STEPS } from "@/components/inbox-simulator";
 import Reveal from "@/components/reveal";
 
@@ -35,21 +35,6 @@ const DAY: { time: string; title: string; body: string }[] = [
     time: "21:00 — Night",
     title: "Inbox zero",
     body: "Every customer has an answer. The inbox is empty, the day is yours again — and tomorrow the crew starts over.",
-  },
-];
-
-const COMPARISON: { name: string; note: string }[] = [
-  {
-    name: "Lindy",
-    note: "Trial lasts 7 days — then you pay or stop.",
-  },
-  {
-    name: "Sintra",
-    note: "Drafts only — the crew drafts, but sending stays on you.",
-  },
-  {
-    name: "Marblism",
-    note: "No free tier — you pay before you know if it fits.",
   },
 ];
 
@@ -236,45 +221,6 @@ export default function LandingPage() {
                 </li>
               ))}
             </ol>
-          </div>
-        </section>
-        </Reveal>
-
-        {/* Why not the others — honest, no invented numbers */}
-        <Reveal>
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <h2 className="text-balance font-display text-3xl font-bold tracking-[-0.015em] sm:text-4xl">
-            Why not the others
-          </h2>
-          <p className="mt-3 max-w-2xl leading-relaxed text-muted">
-            Other tools do part of the job. CrewDesk does one job end to end —
-            and the free tier is free forever, not a countdown.
-          </p>
-          <div className="mt-8 divide-y divide-line overflow-hidden rounded-xl border border-line bg-panel">
-            <div className="grid grid-cols-[1fr_2fr] gap-4 bg-panel-2 px-5 py-3 text-sm font-semibold">
-              <span>Tool</span>
-              <span>Where it stops</span>
-            </div>
-            {COMPARISON.map((row) => (
-              <div
-                key={row.name}
-                className="grid grid-cols-[1fr_2fr] gap-4 px-5 py-4"
-              >
-                <span className="whitespace-nowrap font-display text-lg font-semibold">
-                  {row.name}
-                </span>
-                <span className="leading-relaxed text-muted">{row.note}</span>
-              </div>
-            ))}
-            <div className="grid grid-cols-[1fr_2fr] gap-4 border border-accent bg-panel-2 px-5 py-4">
-              <span className="whitespace-nowrap font-mono text-sm font-semibold text-accent">
-                CREWDESK
-              </span>
-              <span className="leading-relaxed">
-                Free forever with {FREE_DAILY_LIMIT} replies a day — triage,
-                reply, and approval in one place.
-              </span>
-            </div>
           </div>
         </section>
         </Reveal>
