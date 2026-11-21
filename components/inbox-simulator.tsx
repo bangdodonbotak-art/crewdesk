@@ -306,9 +306,13 @@ export default function InboxSimulator() {
   // numbers: React owns the transform via a style prop on the CURRENT
   // node — no timeline to kill, no selector to resolve, no stale node.
   // When the card is half visible the three step layers split apart in
-  // shallow 2.5D and reassemble (~2.4s), captions stepping 1/4-4/4
-  // with a guaranteed 0.6s dwell each. The step engine pauses for the
+  // shallow 2.5D and reassemble (~2.4s). The step engine pauses for the
   // 2.4s, then resumes where it left off. Replay re-runs it.
+  // FIX-REPORT-3D-5: the pulse's timeout chain drives ONLY the layer
+  // transforms (explodeStep). It used to drive the caption too, and
+  // the two raced — the pulse blinked 4/4 "Sent" while the demo was
+  // still in Triage. The caption is now derived from the step state
+  // only (see explosionCaption) and never reads explodeStep.
   // Desktop fine-pointer >=1025px + no reduced-motion only; everywhere
   // else the card is static, exactly as before.
   useEffect(() => {
@@ -447,18 +451,23 @@ export default function InboxSimulator() {
         ? (currentStep + 1) / STEPS.length
         : 1;
 
-  // FIX-REPORT-3D-4: numbered captions DWELL with their step. Round 3
-  // showed the numbered caption only during the 2.4s pulse (~0.6s each,
-  // then the intro line for the whole step dwell — a Step 2 parked for
-  // 20s showed the intro line, not 3/4, and 1/4 never appeared at all).
-  // Now: during the pulse the caption steps 1/4→4/4; after it, the
-  // caption follows the step engine — 1/4 for the whole Triage dwell,
-  // 2/4 for Reply, 3/4 for Approve. At review the decision is still
-  // pending, so 3/4 stays ("Approve: you decide"); once sent, 4/4.
-  // The intro line shows only when idle / rejected.
-  const explosionCaption = explosionPlaying
-    ? EXPLODE_CAPTIONS[Math.max(0, explodeStep - 1)]
-    : stage === "working"
+  // FIX-REPORT-3D-5: the caption is a SINGLE source of truth derived
+  // from the step state (stage + currentStep) — nothing else. Round 4
+  // drove it from TWO sources: the pulse's timeout chain
+  // (explosionPlaying ? EXPLODE_CAPTIONS[explodeStep - 1]) AND the step
+  // engine. They raced at run start: the pulse blinked 2/4 → 3/4 → 4/4
+  // "Sent: it ships" in the first ~2s while the demo was still in
+  // Triage (live re-audit #4, reproduced locally in repro5-caption.mjs),
+  // and a pulse firing mid-run showed 4/4 during Reply — a state claim
+  // the demo was not in. The pulse's timeout chain now drives ONLY the
+  // layer transforms (explodeStep); the caption never reads it. 1/4 for
+  // the whole Triage dwell (pulse + dwell), 2/4 for Reply, 3/4 for
+  // Approve and at review, 4/4 ONLY when stage is actually "sent"
+  // (after the demo Approve click). The intro line shows only in idle
+  // / rejected. The pulse's layers still separate in sequence — the
+  // caption tracks the engine's actual step, not the flourish.
+  const explosionCaption =
+    stage === "working"
       ? EXPLODE_CAPTIONS[Math.max(0, Math.min(2, currentStep))]
       : stage === "review" || stage === "editing"
         ? EXPLODE_CAPTIONS[2]
@@ -552,9 +561,12 @@ export default function InboxSimulator() {
       </div>
 
       {/* Explosion caption — rendered only when the auto-play moment
-          exists (desktop fine pointer). During the 2.4s play it steps
-          1/4→4/4; before/after it is a plain hint. Never a promise the
-          page cannot keep. */}
+          exists (desktop fine pointer). FIX-REPORT-3D-5: the caption is
+          derived from the step state only (stage + currentStep) — 1/4
+          for the whole Triage dwell, 2/4 Reply, 3/4 Approve and at
+          review, 4/4 ONLY once actually sent; the intro line only in
+          idle / rejected. It never follows the pulse's timeout chain,
+          so it can never claim a state the demo is not in. */}
       {explosionState !== "static" && (
         <p className="mt-3 font-mono text-xs text-accent" aria-live="polite">
           {explosionCaption}
@@ -664,8 +676,17 @@ export default function InboxSimulator() {
           approve description colliding with the caption line below
           ("Demo:Demo: you decide…") mid-transition. Now 8px clear above
           the divider and 16px clear below the last row, at any point
-          in the transition and for the whole step dwell. */}
-      <div className="mt-6 min-h-[240px] border-t border-line pt-10 sm:min-h-[216px]">
+          in the transition and for the whole step dwell.
+          FIX-REPORT-3D-5: pt-10 → pt-14 (56px). Live re-audit #4
+          measured the Triage ring GRAZING the divider by ~3px at full
+          separation (ring top ~512 vs divider ~515) — the local model
+          says pt-10 leaves 8px, and the local probe measured 7.4px,
+          so live rendering runs ~10px adverse to the model (font
+          metrics / sub-pixel). +16px of padding puts the ring ~23px
+          clear locally and ~13px clear on the live numbers, at every
+          point in the run. The bottom (mt-12, 16px clear) was never
+          flagged and is untouched. */}
+      <div className="mt-6 min-h-[240px] border-t border-line pt-14 sm:min-h-[216px]">
         <ol className="space-y-4 [perspective:1000px]">
           {STEPS.map((step, index) => {
             const isDone = allStepsDone || currentStep > index;
