@@ -14,6 +14,7 @@ export default function GlobalError({
       <body className="bg-void text-paper">
         <main
           id="main"
+          tabIndex={-1}
           className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-4 text-center"
         >
           <p className="font-mono text-sm text-accent">500</p>

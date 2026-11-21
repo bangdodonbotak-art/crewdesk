@@ -185,7 +185,7 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         {/* Hero — void canvas, one glow, simulator inside */}
         <section id="hero" className="hero-grid relative bg-void text-paper">
           <div aria-hidden="true" className="hero-glow hero-glow-el pointer-events-none absolute inset-0" />

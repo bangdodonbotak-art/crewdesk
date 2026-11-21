@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PLANS } from "../lib/site-data";
 import MotionProvider from "../components/motion-provider";
+import SkipLink from "../components/skip-link";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -67,12 +68,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-cta focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-void"
-        >
-          Skip to content
-        </a>
+        <SkipLink />
         <MotionProvider>{children}</MotionProvider>
       </body>
     </html>

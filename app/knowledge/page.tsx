@@ -171,7 +171,7 @@ export default function KnowledgePage() {
   }
 
   return (
-    <main id="main" className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
         ← Back to Inbox
       </Link>
@@ -179,7 +179,12 @@ export default function KnowledgePage() {
       <p className="mt-1 text-sm text-muted">
         {live ? "Your real knowledge base — the crew answers only from here." : "Demo data — not real customers."}
       </p>
-      {mode === "loading" ? (
+      {/* The loading banner only shows when there is nothing to show yet.
+        Demo entries render immediately from DEMO_KB while the fetch is
+        still in flight, so a "Loading…" banner next to 4 visible entries
+        contradicts what the visitor sees. Once the fetch resolves the
+        demo banner below takes over. */}
+      {mode === "loading" && items.length === 0 ? (
         <p className="mt-2 rounded-md border border-line bg-panel px-3 py-2 text-sm text-muted">
           Loading your knowledge base…
         </p>

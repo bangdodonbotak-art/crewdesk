@@ -56,7 +56,7 @@ function LoginForm() {
   }
 
   return (
-    <main id="main" className="mx-auto max-w-md px-4 py-16 sm:px-6">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-md px-4 py-16 sm:px-6">
       <p className="flex items-center gap-2 text-xs font-semibold text-muted">
         <img src="/logo-96.png" alt="CrewDesk logo" className="h-5 w-5 rounded" />
         <Link href="/" className="inline-flex min-h-11 items-center hover:text-accent">
