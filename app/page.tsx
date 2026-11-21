@@ -83,7 +83,7 @@ function StickyMobileCta() {
     >
       <div className="flex items-center gap-3 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
         <a
-          href="#pricing"
+          href="/login"
           tabIndex={visible ? 0 : -1}
           className="flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-full bg-cta px-4 text-sm font-semibold text-void"
         >
@@ -129,7 +129,7 @@ export default function LandingPage() {
             </a>
           </div>
           <a
-            href="#pricing"
+            href="/login"
             className="flex min-h-11 items-center whitespace-nowrap rounded-full border border-transparent bg-cta px-4 text-sm font-semibold text-void hover:border-accent"
           >
             Start free
@@ -152,7 +152,7 @@ export default function LandingPage() {
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <a
-                href="#pricing"
+                href="/login"
                 className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-6 py-3.5 text-base font-semibold text-void"
               >
                 {HERO.cta}
@@ -336,21 +336,21 @@ export default function LandingPage() {
                   </ul>
                   {plan.comingSoon ? (
                     <a
-                      href="#faq"
+                      href="/login"
                       className="mt-6 inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-5 text-sm font-semibold text-paper hover:border-accent"
                     >
                       {ctaLabel}
                     </a>
                   ) : isStarter ? (
                     <a
-                      href="#top"
+                      href="/login"
                       className="mt-6 inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-5 text-sm font-semibold text-void"
                     >
                       {ctaLabel}
                     </a>
                   ) : (
                     <a
-                      href="#top"
+                      href="/login"
                       className="mt-6 inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-5 text-sm font-semibold text-paper hover:border-accent"
                     >
                       {ctaLabel}
