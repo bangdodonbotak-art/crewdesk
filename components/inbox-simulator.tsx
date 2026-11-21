@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { DEMO_NOTICE, PLANS } from "@/lib/site-data";
 
 /**
@@ -88,8 +87,8 @@ type Stage = "idle" | "working" | "review" | "editing" | "sent" | "rejected";
 
 const STEP_MS = 2750;
 
-// Scrub captions for "The inbox, exploded" — one per quarter of the
-// pinned scrub. Plain product copy, no invented numbers.
+// Explosion captions for "The inbox, exploded" — one per quarter of the
+// 2.4s auto-play. Plain product copy, no invented numbers.
 const EXPLODE_CAPTIONS = [
   "1 / 4 — Triage: the crew reads the message",
   "2 / 4 — Reply: a draft from your knowledge base",
@@ -97,15 +96,7 @@ const EXPLODE_CAPTIONS = [
   "4 / 4 — Sent: it ships",
 ];
 
-/** Scrub gate — computed once in app/page.tsx (single source of truth)
- * and passed down, so the wrapper padding, the card's sticky class, and
- * the scrub install all read the same value. */
-export interface ScrubGate {
-  mode: string;
-  reason: string;
-}
-
-export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) {
+export default function InboxSimulator() {
   const [exampleId, setExampleId] = useState<string>(EXAMPLES[0].id);
   const [customerMessage, setCustomerMessage] = useState<string>(
     EXAMPLES[0].customerMessage,
@@ -119,23 +110,31 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
   const [manualPaused, setManualPaused] = useState(false);
   const [hoverPaused, setHoverPaused] = useState(false);
   const [outOfViewPaused, setOutOfViewPaused] = useState(false);
-  // scrollMode: the pinned "exploded" scrub owns the card while active —
-  // the timer-driven step engine is suspended, never fighting the scrub.
-  // One controller at a time: ambient OR scroll OR manual (ensemble).
-  const [scrollMode, setScrollMode] = useState(false);
-  // scrubReady: true only when the pinned scrub was actually installed
-  // (desktop fine pointer, no reduced-motion — no cores gate; see
-  // app/page.tsx). The scrub caption renders only then — never a promise
-  // the page cannot keep.
-  const [scrubReady, setScrubReady] = useState(false);
-  // scrubState: diagnostic for the live check — WHY the scrub is static
-  // when it is (FIX-REPORT-3D: the live audit saw no pin and could not
-  // tell whether the gate, the pointer, or the engine was at fault).
-  const [scrubState, setScrubState] = useState<{
-    mode: string;
-    reason: string;
-  }>({ mode: "static", reason: "init" });
+  // FIX-REPORT-3D-2: the scroll-linked hold failed twice live (GSAP pin,
+  // then CSS sticky) with NO measurable root cause — rule applied
+  // (z-index:10 proves it), ancestors clean (no overflow/transform/
+  // filter), wrapper 2361px tall, gate active — yet real Chrome scrolls
+  // 1:1. The hold is unprovable in this VM (Obscura ignores nested
+  // sticky AND misreports computed top), and the 160vh scroll room left
+  // a 3–4 viewport empty hole on the live page. So the explosion is now
+  // an INTO-VIEW AUTO-PLAY: when the card is half visible, the three
+  // layers pull apart and reassemble once (~2.4s), captions stepping
+  // 1/4→4/4 with a guaranteed 0.6s dwell each (the old scrub's "3/4
+  // never caught" was a scroll-sampling artifact). No pin, no sticky,
+  // no spacer, no hole. The step engine pauses for the 2.4s (same
+  // pattern as the old scrollMode pause, but time-bounded), then
+  // resumes. Desktop fine-pointer ≥1025px + no reduced-motion only;
+  // everywhere else the card is static, exactly as before.
+  const [explosionState, setExplosionState] = useState<
+    "static" | "armed" | "playing" | "done"
+  >("static");
+  const [explosionReason, setExplosionReason] = useState("init");
   const [explodeCaption, setExplodeCaption] = useState(0);
+  const [explosionPlaying, setExplosionPlaying] = useState(false);
+  const explosionPlayedRef = useRef(false);
+  const explosionArmedRef = useRef(false);
+  const explosionTlRef = useRef<gsap.core.Timeline | null>(null);
+  const playExplosionRef = useRef<(() => void) | null>(null);
   const [userInteracted, setUserInteracted] = useState(false);
   const [draftShown, setDraftShown] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -160,19 +159,18 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
   // hoverPaused — on touch a tap would otherwise freeze the engine
   // with no pointerleave to release it (ensemble).
   const canHoverPauseRef = useRef(false);
-  // FIX-REPORT-3D: scrollMode NO LONGER pauses the step engine. The
-  // exploded scrub is VISUAL ONLY — it never drives the steps — so a
-  // pinned card must not freeze the timer (live audit: Pause→Resume
-  // stuck at Step 2 while the pin was active, scrub caption "1/4 —
-  // Triage"). scrollMode still drives the scrub caption, nothing else.
-  const paused = manualPaused || hoverPaused || outOfViewPaused;
+  // FIX-REPORT-3D-2: explosionPlaying pauses the step engine for the
+  // 2.4s auto-play, then it resumes where it left off. The old
+  // scrollMode pause is gone with the scrub.
+  const paused =
+    manualPaused || hoverPaused || outOfViewPaused || explosionPlaying;
   // Diagnostic for the live check: which pause flags are active now.
   const pauseFlags =
     [
       manualPaused ? "manual" : null,
       hoverPaused ? "hover" : null,
       outOfViewPaused ? "outofview" : null,
-      scrollMode ? "scroll" : null,
+      explosionPlaying ? "explosion" : null,
     ]
       .filter(Boolean)
       .join("+") || "none";
@@ -199,6 +197,10 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
       setReducedMotion(true);
       setStage("review");
       setCurrentStep(STEPS.length - 1);
+      // FIX-REPORT-3D-2: no explosion on reduced-motion — static card.
+      explosionArmedRef.current = false;
+      setExplosionState("static");
+      setExplosionReason("reduced-motion");
       return;
     }
     setStage("working");
@@ -208,6 +210,19 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
     // A fresh ambient cycle re-enables hover-pause (FIX-REPORT-3D).
     hoverArmedRef.current = true;
     hoverEnabledRef.current = true;
+    // FIX-REPORT-3D-2: arm the into-view explosion (desktop fine pointer
+    // ≥1025px only). The observer effect below does the rest.
+    if (
+      window.matchMedia("(min-width: 1025px) and (pointer: fine)").matches
+    ) {
+      explosionArmedRef.current = true;
+      setExplosionState("armed");
+      setExplosionReason("ok");
+    } else {
+      explosionArmedRef.current = false;
+      setExplosionState("static");
+      setExplosionReason("width-or-pointer");
+    }
   }, []);
 
   // Viewport behaviour: restart the ambient cycle when the simulator
@@ -284,142 +299,98 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
     return () => clearTimeout(timer);
   }, [running, paused, currentStep, stage, isAuto]);
 
-  // "The inbox, exploded" — the single 3D moment (CSS/GSAP only, 0 KB
-  // new bundle). One sticky desktop scrub: the card sticks at top:72
-  // while the page scrolls through the wrapper's 160vh of scroll room,
-  // and the three step layers split apart in shallow 2.5D (translateZ +
-  // small rotateX, no nested preserve-3d), then reassemble. Scroll
-  // backwards rewinds the story.
-  //
-  // FIX-REPORT-3D: this USED to be a ScrollTrigger pin. The pin parked
-  // the card at viewport-top ~682px in a 998px viewport (measured 3x,
-  // two builds: it engages ~600px early no matter what — anticipatePin
-  // removed, refresh added, same result), hiding the Pause button and
-  // the exploding layers below the fold — exactly what the live audit
-  // saw ("no pin, flat card"). CSS sticky is deterministic by
-  // construction: the card sticks at exactly 72px, no measurement, no
-  // spacer, no Lenis interaction. The scrub timeline is unchanged —
-  // only its driver changed (pin → sticky wrapper scroll-through).
-  //
-  // Gates live in app/page.tsx (scrubGate prop — single source of
-  // truth). The scrub is VISUAL ONLY — it never drives the step engine
-  // and never pauses it either (scrollMode used to freeze the timer
-  // while pinned, which stuck Pause→Resume at Step 2 in the live
-  // audit). Mobile / coarse pointer / low-core / reduced-motion: no
-  // stick, no scrub — the simulator renders exactly as before.
+  // "The inbox, exploded" — the single 3D moment (GSAP only, 0 KB new
+  // bundle), as an INTO-VIEW AUTO-PLAY (FIX-REPORT-3D-2). The scroll
+  // hold failed twice live (GSAP pin, then CSS sticky) with no
+  // measurable root cause, and the 160vh scroll room left a 3–4
+  // viewport empty hole on the live page — so there is no hold, no
+  // spacer, no scrub at all anymore. When the card is half visible
+  // the three step layers split apart in shallow 2.5D (translateZ +
+  // small rotateX, no nested preserve-3d) and reassemble (~2.4s),
+  // captions stepping 1/4→4/4 with a guaranteed 0.6s dwell each.
+  // The step engine pauses for the 2.4s, then resumes where it left
+  // off. Replay re-runs it (same "watch the demo again" intent as
+  // the steps). Desktop fine-pointer ≥1025px + no reduced-motion
+  // only; everywhere else the card is static, exactly as before.
   useEffect(() => {
-    if (scrubGate.mode !== "active") {
-      setScrubState({ mode: "static", reason: scrubGate.reason });
-      return;
-    }
+    if (reducedMotion || !explosionArmedRef.current) return;
     const el = containerRef.current;
     if (!el) return;
-    // The sticky card's parent is the scroll room: the trigger is the
-    // WRAPPER, whose height (card + 160vh padding) is the scrub range.
-    const wrapper = el.parentElement;
-    if (!wrapper) return;
-    gsap.registerPlugin(ScrollTrigger);
-    const mm = gsap.matchMedia();
-    mm.add("(min-width: 1025px) and (pointer: fine)", () => {
-      setScrubReady(true);
-      setScrubState({ mode: "active", reason: "ok" });
-      // Scoped context: selector text below resolves inside this card
-      // only, and ctx.revert() kills the timeline + ScrollTrigger +
-      // clears the inline transforms on unmount or breakpoint exit.
-      const ctx = gsap.context(() => {
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: wrapper,
-            start: "top top+=72",
-            end: "bottom bottom",
-            scrub: 1,
-            onToggle: (self: { isActive: boolean }) =>
-              setScrollMode(self.isActive),
-            onUpdate: (self: { progress: number }) => {
-              const q = Math.min(3, Math.floor(self.progress * 4));
-              setExplodeCaption((prev) => (prev === q ? prev : q));
-            },
-          },
-        });
-        tl.to(
-          '[data-layer="triage"]',
-          { y: -32, rotationX: -8, z: 30, duration: 1, ease: "none" },
-          0,
+    const play = () => {
+      if (explosionPlayedRef.current) return;
+      explosionPlayedRef.current = true;
+      explosionTlRef.current?.kill();
+      setExplosionPlaying(true);
+      setExplosionState("playing");
+      const tl = gsap.timeline({
+        onUpdate: () => {
+          const q = Math.min(3, Math.floor(tl.progress() * 4));
+          setExplodeCaption((prev) => (prev === q ? prev : q));
+        },
+        onComplete: () => {
+          setExplosionPlaying(false);
+          setExplosionState("done");
+          setExplodeCaption(0);
+        },
+      });
+      explosionTlRef.current = tl;
+      tl.to(
+        '[data-layer="triage"]',
+        { y: -32, rotationX: -8, z: 30, duration: 0.6, ease: "power1.inOut" },
+        0,
+      )
+        .to(
+          '[data-layer="reply"]',
+          { y: 0, rotationX: 0, z: 70, scale: 1.02, duration: 0.6, ease: "power1.inOut" },
+          0.6,
         )
-          .to(
-            '[data-layer="reply"]',
-            {
-              y: 0,
-              rotationX: 0,
-              z: 70,
-              scale: 1.02,
-              duration: 1,
-              ease: "none",
-            },
-            1,
-          )
-          .to(
-            '[data-layer="approve"]',
-            { y: 32, rotationX: 8, z: 30, duration: 1, ease: "none" },
-            2,
-          )
-          .to(
-            '[data-layer="triage"]',
-            { y: 0, rotationX: 0, z: 0, duration: 1, ease: "none" },
-            3,
-          )
-          .to(
-            '[data-layer="reply"]',
-            { y: 0, rotationX: 0, z: 0, scale: 1, duration: 1, ease: "none" },
-            3,
-          )
-          .to(
-            '[data-layer="approve"]',
-            { y: 0, rotationX: 0, z: 0, duration: 1, ease: "none" },
-            3,
-          );
-      }, el);
-      // Re-measure after layout settles (fonts, images, hero entrance):
-      // the scrub range is measured once at creation, and the card
-      // grows when the draft appears. A stale range would cut the
-      // explode short or run it past the unstick point.
-      requestAnimationFrame(() => ScrollTrigger.refresh());
-      if (document.fonts?.ready) {
-        document.fonts.ready
-          .then(() => ScrollTrigger.refresh())
-          .catch(() => {});
-      }
-      const refreshTimer = window.setTimeout(
-        () => ScrollTrigger.refresh(),
-        1000,
-      );
-      return () => {
-        window.clearTimeout(refreshTimer);
-        ctx.revert();
-        setScrollMode(false);
-        setScrubReady(false);
-        setScrubState({ mode: "static", reason: "breakpoint-exit" });
-      };
-    });
-    return () => mm.revert();
-  }, [reducedMotion, scrubGate.mode, scrubGate.reason]);
+        .to(
+          '[data-layer="approve"]',
+          { y: 32, rotationX: 8, z: 30, duration: 0.6, ease: "power1.inOut" },
+          1.2,
+        )
+        .to(
+          '[data-layer="triage"]',
+          { y: 0, rotationX: 0, z: 0, duration: 0.6, ease: "power1.inOut" },
+          1.8,
+        )
+        .to(
+          '[data-layer="reply"]',
+          { y: 0, rotationX: 0, z: 0, scale: 1, duration: 0.6, ease: "power1.inOut" },
+          1.8,
+        )
+        .to(
+          '[data-layer="approve"]',
+          { y: 0, rotationX: 0, z: 0, duration: 0.6, ease: "power1.inOut" },
+          1.8,
+        );
+    };
+    // Replay button re-runs the explosion (same intent as re-running
+    // the steps). No-op on mobile / reduced-motion (ref unset there).
+    playExplosionRef.current = () => {
+      explosionPlayedRef.current = false;
+      play();
+    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) play();
+      },
+      // Threshold 0.5, not 0: at load only ~7% of the card is visible
+      // (1280x800), so 0 would fire while the visitor is still reading
+      // the hero and the 2.4s moment would be missed. 0.5 fires when
+      // the visitor has actually scrolled to the card.
+      { threshold: 0.5 },
+    );
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      playExplosionRef.current = null;
+      explosionTlRef.current?.kill();
+      explosionTlRef.current = null;
+    };
+  }, [reducedMotion]);
 
-  // The draft panel appears/disappears with the stage, changing the card
-  // height — and the sticky wrapper's height with it. Refresh so the
-  // scrub range tracks the real height, or the explode finishes before
-  // (or after) the card unsticks (live audit #4 was the same stale
-  // measurement on the old pin-spacer).
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      try {
-        gsap.registerPlugin(ScrollTrigger);
-        ScrollTrigger.refresh();
-      } catch {
-        /* ScrollTrigger not installed yet (static mode) — nothing to do. */
-      }
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [stage]);
+
 
   const stopAmbient = () => {
     setRunning(false);
@@ -446,6 +417,13 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
     setRunning(true);
   };
 
+  // FIX-REPORT-3D-2: Replay re-runs the explosion too (same "watch the
+  // demo again" intent as re-running the steps). No-op on mobile /
+  // reduced-motion, where the ref is never set.
+  const replayExplosion = () => {
+    playExplosionRef.current?.();
+  };
+
   const replay = () => {
     setUserInteracted(true);
     setAutoDone(false);
@@ -454,6 +432,7 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
     setCurrentStep(0);
     setRunning(true);
     setIsAuto(true);
+    replayExplosion();
   };
 
   const reset = () => {
@@ -498,12 +477,10 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
   return (
     <div
       ref={containerRef}
-      data-scrub={scrubState.mode}
-      data-scrub-reason={scrubState.reason}
+      data-explosion={explosionState}
+      data-explosion-reason={explosionReason}
       data-pause={pauseFlags}
-      className={`rounded-xl border border-line bg-panel p-5 shadow-sm sm:p-6 ${
-        scrubGate.mode === "active" ? "sim-sticky" : ""
-      }`}
+      className="rounded-xl border border-line bg-panel p-5 shadow-sm sm:p-6"
       onMouseEnter={() => {
         if (
           canHoverPauseRef.current &&
@@ -575,14 +552,15 @@ export default function InboxSimulator({ scrubGate }: { scrubGate: ScrubGate }) 
         </span>
       </div>
 
-      {/* Scrub caption — rendered only when the pinned scrub is actually
-          installed (desktop fine pointer). Never a promise the page
-          cannot keep. */}
-      {scrubReady && (
+      {/* Explosion caption — rendered only when the auto-play moment
+          exists (desktop fine pointer). During the 2.4s play it steps
+          1/4→4/4; before/after it is a plain hint. Never a promise the
+          page cannot keep. */}
+      {explosionState !== "static" && (
         <p className="mt-3 font-mono text-xs text-accent" aria-live="polite">
-          {scrollMode
+          {explosionPlaying
             ? EXPLODE_CAPTIONS[explodeCaption]
-            : "Scroll to pull one message apart — Triage · Reply · Approve"}
+            : "Watch one message pull apart — Triage · Reply · Approve"}
         </p>
       )}
 

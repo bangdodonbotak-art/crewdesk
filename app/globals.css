@@ -143,24 +143,8 @@ h3 {
   }
 }
 
-/* Sticky simulator — FIX-REPORT-3D (replaces the ScrollTrigger pin).
-   The GSAP pin parked the card at viewport-top ~682px in a 998px
-   viewport (measured 3x, two builds: pin engages ~600px early no
-   matter what — anticipatePin removed, refresh added, same result).
-   A pinned card that low hides the Pause button and the exploding
-   layers below the fold, which is exactly what the live audit saw.
-   CSS sticky is deterministic by construction: the card sticks at
-   exactly 72px, no measurement, no spacer, no Lenis interaction.
-   Both classes are applied ONLY when React's scrub gate passes
-   (desktop fine pointer, >4 cores, no reduced-motion) — the gate
-   lives in app/page.tsx and is passed to the simulator as a prop.
-   Never apply these unconditionally: on mobile / reduced-motion /
-   low-core the card must not stick and the wrapper must not grow. */
-.sim-sticky {
-  position: sticky;
-  top: 72px;
-  z-index: 10;
-}
-.sim-scroll-room {
-  padding-bottom: 160vh;
-}
+/* FIX-REPORT-3D-2: .sim-sticky / .sim-scroll-room REMOVED. The scroll
+   hold failed twice live (GSAP pin, then CSS sticky) with no measurable
+   root cause, and the 160vh scroll room left a 3–4 viewport empty hole
+   on the live page. The explosion is now an into-view auto-play with
+   no hold and no spacer — see components/inbox-simulator.tsx. */

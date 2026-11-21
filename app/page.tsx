@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { DEMO_NOTICE, FAQ, HERO, PLANS, SITE } from "@/lib/site-data";
-import InboxSimulator, { STEPS, type ScrubGate } from "@/components/inbox-simulator";
+import InboxSimulator, { STEPS } from "@/components/inbox-simulator";
 import WaitlistForm from "@/components/waitlist-form";
 import Reveal from "@/components/reveal";
 import { useMotion } from "@/components/motion-provider";
@@ -97,35 +97,6 @@ export default function LandingPage() {
   // Day inbox count — the 6 demo threads draining to zero across the
   // workday. Updated by the scrub via ref (no re-render per tick).
   const dayCountRef = useRef<HTMLSpanElement>(null);
-  // Scrub gate — SINGLE source of truth (FIX-REPORT-3D, sticky version).
-  // The simulator's scrub AND the wrapper's scroll-room padding AND the
-  // card's sticky class all read this one value, so the padding exists
-  // BEFORE the scrub measures its trigger range. Gates: desktop fine
-  // pointer ≥1025px, no reduced-motion. NO cores gate: measured 21 Nov
-  // 2026 — scrub active vs static under 4x CPU throttling is identical
-  // (avg frame 49ms vs 51.7ms, p95 91ms vs 139ms, 0 longtasks both);
-  // the scrub is 3 transform/opacity tweens + caption + bg crossfade and
-  // never blocks the main thread. hardwareConcurrency measures
-  // parallelism, but the scrub is single-threaded — a 2-core laptop runs
-  // it fine. A cores cutoff would silently kill the moment on ordinary
-  // machines (the 21 Nov live failure: cloud browser reported ≤4 cores).
-  const [scrubGate, setScrubGate] = useState<ScrubGate>({
-    mode: "static",
-    reason: "init",
-  });
-  useEffect(() => {
-    if (reducedMotion) {
-      setScrubGate({ mode: "static", reason: "reduced-motion" });
-      return;
-    }
-    if (
-      !window.matchMedia("(min-width: 1025px) and (pointer: fine)").matches
-    ) {
-      setScrubGate({ mode: "static", reason: "width-or-pointer" });
-      return;
-    }
-    setScrubGate({ mode: "active", reason: "ok" });
-  }, [reducedMotion]);
 
   // Hero entrance (mount) + the page's only scrub (timeline line).
   // Transform + opacity only; skipped entirely on reduced-motion.
@@ -298,9 +269,9 @@ export default function LandingPage() {
             </div>
             <div
               data-hero="sim"
-              className={`mt-10 sm:mt-12 ${scrubGate.mode === "active" ? "sim-scroll-room" : ""}`}
+              className="mt-10 sm:mt-12"
             >
-              <InboxSimulator scrubGate={scrubGate} />
+              <InboxSimulator />
             </div>
           </div>
         </section>
