@@ -69,7 +69,7 @@ export default function KnowledgePage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <main id="main" className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
         ← Back to Inbox
       </Link>

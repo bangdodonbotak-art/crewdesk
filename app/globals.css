@@ -23,8 +23,12 @@
   --color-cta: #ffffff;
 }
 
-html {
-  scroll-behavior: smooth;
+/* Anchor smooth-scroll only when Lenis is OFF (coarse pointer / mobile).
+   On desktop Lenis owns scrolling; a global smooth behaviour fights it. */
+@media (pointer: coarse) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {

@@ -5,6 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://crewdesk-nine.vercel.app"),
+  alternates: { canonical: "https://crewdesk-nine.vercel.app/" },
   title: "CrewDesk — Hire an AI crew to run your support inbox",
   description:
     "CrewDesk triages your support inbox, drafts replies from your knowledge base, and waits for your approval. Free forever — 5 replies a day, no card.",
@@ -13,7 +14,8 @@ export const metadata: Metadata = {
     description:
       "CrewDesk triages your support inbox, drafts replies from your knowledge base, and waits for your approval. Free forever — 5 replies a day, no card.",
     type: "website",
-    images: [{ url: "/logo.png", width: 512, height: 512, alt: "CrewDesk logo" }],
+    url: "https://crewdesk-nine.vercel.app/",
+    images: [{ url: "/logo.webp", width: 512, height: 512, alt: "CrewDesk logo" }],
   },
   icons: { icon: "/logo-96.png", apple: "/logo.png" },
   twitter: {
@@ -65,6 +67,12 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-cta focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-void"
+        >
+          Skip to content
+        </a>
         <MotionProvider>{children}</MotionProvider>
       </body>
     </html>

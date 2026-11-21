@@ -10,15 +10,25 @@ interface RevealProps {
   children: ReactNode;
   /** Stagger delay in seconds (0.06–0.12 typical). */
   delay?: number;
+  /** When true, animate each `[data-reveal-child]` descendant with a
+   * stagger instead of animating the wrapper as one block. The wrapper
+   * itself is NOT animated in that mode — targets never overlap. */
+  staggerChildren?: boolean;
   className?: string;
 }
 
 /**
  * Reveal — scroll-triggered fade + rise. Transform + opacity ONLY.
- * gsap.from opacity 0 → 1, y 12 → 0, 0.7s, power2.out.
+ * Runs on ALL viewports (the old `(min-width: 769px)` gate is gone);
+ * on narrow screens the trigger starts earlier (`top 90%`).
  * Reduced-motion: renders children directly, no animation.
  */
-export default function Reveal({ children, delay = 0, className }: RevealProps) {
+export default function Reveal({
+  children,
+  delay = 0,
+  staggerChildren = false,
+  className,
+}: RevealProps) {
   const ref = useRef<HTMLDivElement>(null);
   const { reducedMotion } = useMotion();
 
@@ -28,26 +38,37 @@ export default function Reveal({ children, delay = 0, className }: RevealProps) 
     if (!el) return;
 
     gsap.registerPlugin(ScrollTrigger);
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const start = isMobile ? "top 90%" : "top 85%";
+    const stagger = delay || 0.1;
 
-    // gsap.matchMedia — scroll reveals are desktop-only.
-    const mm = gsap.matchMedia();
-    mm.add("(min-width: 769px)", () => {
+    const ctx = gsap.context(() => {
+      if (staggerChildren) {
+        const items = el.querySelectorAll("[data-reveal-child]");
+        if (items.length > 0) {
+          gsap.from(items, {
+            opacity: 0,
+            y: 16,
+            duration: 0.6,
+            ease: "power2.out",
+            stagger,
+            scrollTrigger: { trigger: el, start, once: true },
+          });
+        }
+        return;
+      }
       gsap.from(el, {
         opacity: 0,
         y: 12,
         duration: 0.7,
         delay,
         ease: "power2.out",
-        scrollTrigger: {
-          trigger: el,
-          start: "top 85%",
-          once: true,
-        },
+        scrollTrigger: { trigger: el, start, once: true },
       });
-    });
+    }, el);
 
-    return () => mm.revert();
-  }, [reducedMotion, delay]);
+    return () => ctx.revert();
+  }, [reducedMotion, delay, staggerChildren]);
 
   return (
     <div ref={ref} className={className}>

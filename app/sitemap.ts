@@ -3,11 +3,13 @@ import { SITE } from "@/lib/site-data";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = SITE.url;
-  const routes = ["/", "/dashboard", "/knowledge", "/settings"];
+  // Only the public landing page is indexed. App pages (/dashboard,
+  // /knowledge, /settings, /inbox) are behind auth and Disallowed in robots.
+  const routes = ["/"];
   return routes.map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
-    changeFrequency: route === "/" ? "weekly" : "monthly",
-    priority: route === "/" ? 1 : 0.5,
+    changeFrequency: "weekly",
+    priority: 1,
   }));
 }

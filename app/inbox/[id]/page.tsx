@@ -42,7 +42,7 @@ export default function InboxDetailPage({
 
   if (!thread) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <main id="main" className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
           ← Back to Inbox
         </Link>
@@ -73,7 +73,7 @@ export default function InboxDetailPage({
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <main id="main" className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
         ← Back to Inbox
       </Link>
@@ -102,7 +102,7 @@ export default function InboxDetailPage({
           {thread.category}
         </span>
         <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
-          {thread.status}
+          {displayStatus}
         </span>
         <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
           Sentiment: {thread.sentiment}

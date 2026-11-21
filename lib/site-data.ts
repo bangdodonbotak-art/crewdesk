@@ -8,8 +8,8 @@
 export const SITE = {
   name: "CrewDesk",
   tagline: "Hire an AI crew for one job.",
-  /** Placeholder domain — not claimed live. */
-  url: "https://crewdesk.app",
+  /** Live URL (Vercel). The app is deployed here; crewdesk.app is not bought. */
+  url: "https://crewdesk-nine.vercel.app",
 } as const;
 
 export const FREE_DAILY_LIMIT = 5;

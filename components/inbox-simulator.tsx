@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DEMO_NOTICE, PLANS } from "@/lib/site-data";
 
 /**
@@ -99,8 +99,13 @@ export default function InboxSimulator() {
   const [autoDone, setAutoDone] = useState(false);
   const [manualPaused, setManualPaused] = useState(false);
   const [hoverPaused, setHoverPaused] = useState(false);
+  const [outOfViewPaused, setOutOfViewPaused] = useState(false);
+  const [userInteracted, setUserInteracted] = useState(false);
+  const [draftShown, setDraftShown] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const paused = manualPaused || hoverPaused;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const prevInViewRef = useRef(false);
+  const paused = manualPaused || hoverPaused || outOfViewPaused;
 
   // Mount: one ambient auto-play cycle — or a static review frame when the
   // user prefers reduced motion.
@@ -117,6 +122,57 @@ export default function InboxSimulator() {
     setRunning(true);
     setIsAuto(true);
   }, []);
+
+  // Viewport behaviour: restart the ambient cycle when the simulator
+  // scrolls back into view (only if the user never touched a control),
+  // auto-pause while it is out of view. Reduced-motion never restarts.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const inView = entries[0].isIntersecting;
+        setOutOfViewPaused(!inView);
+        // Restart ONLY on a real out-of-view → in-view transition.
+        // (The observer fires once on observe() with the current state;
+        // without the prev-check the restart would re-trigger itself
+        // every time the effect re-ran after a cycle finished.)
+        const wasOut = !prevInViewRef.current;
+        prevInViewRef.current = inView;
+        if (
+          inView &&
+          wasOut &&
+          autoDone &&
+          !userInteracted &&
+          !reducedMotion &&
+          stage === "review"
+        ) {
+          setAutoDone(false);
+          setStage("working");
+          setCurrentStep(0);
+          setRunning(true);
+          setIsAuto(true);
+        }
+      },
+      // NOTE: threshold is 0, not 0.3 — the simulator card is taller than
+      // the viewport space left below the hero at load (1280x800 shows
+      // only ~7% of it), so 0.3 would report "out of view" on load and
+      // pause the ambient autoplay before it ever ran. Any visible pixel
+      // counts as "in view"; fully scrolled past still auto-pauses.
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [autoDone, userInteracted, reducedMotion, stage]);
+
+  // Draft panel entrance: fade + rise when the review stage arrives.
+  useEffect(() => {
+    if (stage === "review" || stage === "editing") {
+      const raf = requestAnimationFrame(() => setDraftShown(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setDraftShown(false);
+  }, [stage]);
 
   // Step engine: advance one step per STEP_MS while a run is in progress
   // and not paused. Finishing the last step lands on review and stops —
@@ -143,6 +199,7 @@ export default function InboxSimulator() {
     setIsAuto(false);
     setAutoDone(false);
     setManualPaused(false);
+    setUserInteracted(true);
   };
 
   const pickExample = (example: Example) => {
@@ -163,6 +220,7 @@ export default function InboxSimulator() {
   };
 
   const replay = () => {
+    setUserInteracted(true);
     setAutoDone(false);
     setManualPaused(false);
     setStage("working");
@@ -212,6 +270,7 @@ export default function InboxSimulator() {
 
   return (
     <div
+      ref={containerRef}
       className="rounded-xl border border-line bg-panel p-5 shadow-sm sm:p-6"
       onMouseEnter={() => setHoverPaused(true)}
       onMouseLeave={() => setHoverPaused(false)}
@@ -237,7 +296,7 @@ export default function InboxSimulator() {
       </div>
       {/* Progress bar — scaleX from the left, no layout animation */}
       <div
-        className="mt-4 h-0.5 overflow-hidden rounded-full bg-panel-3"
+        className="mt-4 h-1 overflow-hidden rounded-full bg-panel-3"
         aria-hidden="true"
       >
         <div
@@ -245,6 +304,13 @@ export default function InboxSimulator() {
           style={{ transform: `scaleX(${progress})` }}
         />
       </div>
+      <p className="mt-2 text-xs text-meta" aria-live="polite">
+        {stage === "working"
+          ? `Step ${currentStep + 1} of ${STEPS.length} — ${STEPS[Math.max(0, currentStep)].label}`
+          : stage === "idle"
+            ? "Not started yet"
+            : `Step ${STEPS.length} of ${STEPS.length} — ${STEPS[STEPS.length - 1].label}`}
+      </p>
 
       <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
         <h3 className="text-balance font-display text-2xl font-semibold">
@@ -265,10 +331,10 @@ export default function InboxSimulator() {
               type="button"
               onClick={() => pickExample(example)}
               aria-pressed={exampleId === example.id}
-              className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-3.5 text-sm font-medium transition-colors ${
+              className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-3.5 text-sm font-medium transition-all duration-150 ${
                 exampleId === example.id
                   ? "border-accent bg-accent/10 text-accent"
-                  : "border-line bg-panel-2 text-paper hover:border-accent"
+                  : "border-line bg-panel-2 text-paper hover:border-accent active:scale-[0.97]"
               }`}
             >
               {example.label}
@@ -301,7 +367,7 @@ export default function InboxSimulator() {
           type="button"
           onClick={runCrew}
           disabled={stage === "working" || customerMessage.trim().length === 0}
-          className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-5 text-sm font-semibold text-void transition-opacity disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-5 text-sm font-semibold text-void transition-all duration-200 hover:-translate-y-px disabled:opacity-50 active:translate-y-0 active:scale-[0.98]"
         >
           {stage === "working" ? "Crew working…" : "Let the crew work"}
         </button>
@@ -310,7 +376,7 @@ export default function InboxSimulator() {
             type="button"
             onClick={() => setManualPaused((p) => !p)}
             aria-pressed={manualPaused}
-            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper"
+            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper transition-transform duration-150 hover:border-accent active:scale-[0.98]"
           >
             {manualPaused ? "Resume" : "Pause"}
           </button>
@@ -319,7 +385,7 @@ export default function InboxSimulator() {
           <button
             type="button"
             onClick={replay}
-            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper"
+            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper transition-transform duration-150 hover:border-accent active:scale-[0.98]"
           >
             Replay
           </button>
@@ -331,7 +397,7 @@ export default function InboxSimulator() {
           <button
             type="button"
             onClick={reset}
-            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper"
+            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper transition-transform duration-150 hover:border-accent active:scale-[0.98]"
           >
             Try another message
           </button>
@@ -351,10 +417,17 @@ export default function InboxSimulator() {
             const isDone = allStepsDone || currentStep > index;
             const isCurrent = stage === "working" && currentStep === index;
             return (
-              <li key={step.id} className="flex gap-4">
+              <li
+                key={step.id}
+                className={`flex gap-4 transition-opacity duration-300 ${
+                  isDone && !isCurrent ? "opacity-55" : "opacity-100"
+                }`}
+              >
                 <span
                   aria-hidden="true"
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-mono text-sm font-medium ${
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-mono text-sm font-medium transition-transform duration-300 ${
+                    isCurrent ? "scale-[1.12] " : ""
+                  }${
                     isDone
                       ? "border-approve bg-approve/10 text-approve"
                       : isCurrent
@@ -399,9 +472,13 @@ export default function InboxSimulator() {
         </p>
       </div>
 
-      {/* Draft + decision */}
+      {/* Draft + decision — fades + rises in when the review stage arrives */}
       {(stage === "review" || stage === "editing") && (
-        <div className="mt-6 rounded-xl border border-line bg-panel-2 p-4">
+        <div
+          className={`mt-6 rounded-xl border border-line bg-panel-2 p-4 transition-all duration-500 ease-out ${
+            draftShown ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+          }`}
+        >
           <p className="text-sm font-medium text-paper">
             Draft reply (demo — not sent yet)
           </p>
@@ -424,7 +501,7 @@ export default function InboxSimulator() {
                   stopAmbient();
                   setStage("review");
                 }}
-                className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-4 text-sm font-semibold text-void"
+                className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-4 text-sm font-semibold text-void transition-transform duration-200 hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
               >
                 Save edit
               </button>
@@ -436,7 +513,7 @@ export default function InboxSimulator() {
                     stopAmbient();
                     setStage("sent");
                   }}
-                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-4 text-sm font-semibold text-void"
+                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-cta px-4 text-sm font-semibold text-void transition-transform duration-200 hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
                 >
                   Approve
                 </button>
@@ -446,7 +523,7 @@ export default function InboxSimulator() {
                     stopAmbient();
                     setStage("editing");
                   }}
-                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper"
+                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-line bg-panel px-4 text-sm font-medium text-paper transition-transform duration-150 hover:border-accent active:scale-[0.98]"
                 >
                   Edit
                 </button>
@@ -456,7 +533,7 @@ export default function InboxSimulator() {
                     stopAmbient();
                     setStage("rejected");
                   }}
-                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-reject/40 bg-panel px-4 text-sm font-medium text-reject"
+                  className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-reject/40 bg-panel px-4 text-sm font-medium text-reject transition-transform duration-150 hover:border-reject active:scale-[0.98]"
                 >
                   Reject
                 </button>

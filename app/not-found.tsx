@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Page not found — CrewDesk",
+  description: "This page does not exist on CrewDesk.",
+  robots: { index: false },
+};
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-void px-6 text-center">
+    <main id="main" className="flex min-h-screen flex-col items-center justify-center bg-void px-6 text-center">
       <p className="font-mono text-sm text-accent">404</p>
       <h1 className="mt-4 max-w-2xl text-paper">
         404 — This page is not on the crew&apos;s list.

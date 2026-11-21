@@ -37,7 +37,7 @@ export default function SettingsPage() {
   const [cleared, setCleared] = useState(false);
 
   const inboundAddress =
-    process.env.CREWDESK_INBOUND_ADDRESS ??
+    process.env.NEXT_PUBLIC_CREWDESK_INBOUND_ADDRESS ??
     "inbox@inbound.crewdesk.example";
 
   async function recordUpgradeIntent() {
@@ -62,7 +62,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <main id="main" className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <Link href="/dashboard" className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">
         ← Back to Inbox
       </Link>
@@ -103,7 +103,8 @@ export default function SettingsPage() {
           {inboundAddress}
         </p>
         <p className="mt-2 text-sm text-muted">
-          Set CREWDESK_INBOUND_ADDRESS in .env.local to change this address.
+          Set NEXT_PUBLIC_CREWDESK_INBOUND_ADDRESS in .env.local (and in
+          Vercel) to change this address.
         </p>
       </section>
 
