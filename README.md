@@ -21,7 +21,7 @@ Prices live in one place: [`lib/site-data.ts`](lib/site-data.ts). Quota counts p
 ## Stack
 
 - Next.js 16.4.6 + React 19.3.1 + Tailwind CSS 4.3.5
-- `@supabase/supabase-js` 2.119.2 (Auth + Postgres + RLS — project not created yet, see Status)
+- `@supabase/supabase-js` 2.119.2 + `@supabase/ssr` 0.12.7 (Auth + Postgres + RLS — project `nizvycrrusghsnefules`, migration applied)
 - Lenis + GSAP for motion
 - Fonts via runtime `<link>`: Inter Variable + JetBrains Mono (no `next/font/google`)
 
@@ -56,7 +56,7 @@ Demo GIF / screenshots: **TODO — not captured yet.** To add one, save a screen
 - Knowledge base (`/knowledge`) — local CRUD + search (browser state only).
 - Settings (`/settings`) — plan, quota, inbound address, upgrade-intent recording (demo, no Stripe).
 - API (demo only): `POST /api/crew/run`, `POST /api/crew/approve`, `POST /api/inbound`, `POST /api/upgrade-intent`.
-- Supabase migration: `supabase/migrations/20261121000000_crewdesk_init.sql` (file only — **not applied anywhere**).
+- Supabase migration: `supabase/migrations/20261121000000_crewdesk_init.sql` (**applied** to project `nizvycrrusghsnefules`, 21 Nov 2026).
 
 ## Project structure
 
@@ -65,17 +65,18 @@ app/          # Next.js App Router pages + API routes
 components/   # Inbox simulator, motion provider, reveal animations
 lib/          # Site data + pricing (single source of truth), crew engine, quota, Supabase clients
 public/       # Logo + icons
-supabase/     # SQL migration (not applied yet)
+supabase/     # SQL migration (applied to nizvycrrusghsnefules)
 ```
 
 ## Status (honest)
 
-MVP demo, live at https://crewdesk-nine.vercel.app/.
+Fullstack web app, live at https://crewdesk-nine.vercel.app/.
 
-- The crew engine is a **state machine over labelled demo data**. No real AI model is wired in yet — free-model wiring (Groq / TokenHarbor) is the next step.
-- No Supabase project exists yet. Auth (Google OAuth) + RLS + the migration need a new project. Do **not** reuse other paused projects.
-- Gmail ingestion is inbound-forward for now. Restricted OAuth scopes need Google verification (weeks + cost).
-- Auth sessions don't persist yet — the callback uses `@supabase/supabase-js` directly; `@supabase/ssr` is needed for real cookie sessions.
+- **Supabase exists and the migration is applied** — project `crewdesk` (`nizvycrrusghsnefules`, ap-southeast-1), migration `supabase/migrations/20261121000000_crewdesk_init.sql` applied 21 Nov 2026 (8 tables, 3 functions, 8 policies — verified via the Management API).
+- **Live model wired** — TokenHarbor DeepSeek free (`deepseek-v4.1-flash:free`, server-side, `CREW_MODEL_API_KEY`), tested live from the VM 21 Nov 2026. Without the key, triage/draft fall back to a labelled demo fallback.
+- **Auth works with `@supabase/ssr`** (cookie sessions, callback `/auth/callback`). Google OAuth needs the provider enabled in Supabase + a Client ID/Secret from Google Cloud Console (owner-only) — until then `/login` shows an honest "not live yet" status and the sign-in button errors instead of pretending to work.
+- **Env vars are NOT set on Vercel yet** — `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_CREWDESK_INBOUND_ADDRESS`, and `CREW_MODEL_API_KEY` must be added in the Vercel dashboard (API access was blocked by team-scope 403), then redeploy. Until then the live site runs on labelled demo data.
+- Gmail ingestion is inbound-forward + per-user secret token (`POST /api/inbound`). Restricted OAuth scopes need Google verification (weeks + cost).
 - No fake metrics, testimonials, or revenue claims anywhere. All demo data is labelled DEMO.
 
 Issues and PRs are welcome — small, focused PRs with a clear description.

@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DEMO_KB } from "@/lib/crew/demo-data";
 
-type KbItem = (typeof DEMO_KB)[number];
+type KbItem = {
+  id: string;
+  question: string;
+  answer: string;
+  updatedAt: string;
+};
+
+type Mode = "loading" | "live" | "demo" | "unauthorized" | "not-configured" | "error";
 
 export default function KnowledgePage() {
+  const [mode, setMode] = useState<Mode>("loading");
   const [items, setItems] = useState<KbItem[]>(DEMO_KB);
   const [query, setQuery] = useState("");
   const [question, setQuestion] = useState("");
@@ -14,6 +22,49 @@ export default function KnowledgePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQuestion, setEditQuestion] = useState("");
   const [editAnswer, setEditAnswer] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Live KB from Supabase; demo data is the honest fallback when the
+  // visitor is signed out or Supabase is not configured.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/knowledge")
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.status === 401) {
+          setMode("unauthorized");
+          return;
+        }
+        if (res.status === 503) {
+          setMode("not-configured");
+          return;
+        }
+        const data = await res.json();
+        if (!data.ok) {
+          setMode("error");
+          return;
+        }
+        setItems(
+          ((data.items ?? []) as { id: string; question: string; answer: string; updated_at: string }[]).map(
+            (i) => ({ id: i.id, question: i.question, answer: i.answer, updatedAt: i.updated_at }),
+          ),
+        );
+        setMode("live");
+        if (data.seeded) {
+          setNotice("Your knowledge base was empty, so 3 starter answers were added — edit or delete them freely.");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setMode("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const live = mode === "live";
+  const demo = mode === "demo" || mode === "unauthorized" || mode === "not-configured" || mode === "error";
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -25,18 +76,48 @@ export default function KnowledgePage() {
     );
   }, [items, query]);
 
-  function handleAdd(e: React.FormEvent) {
+  async function apiCall(method: string, body?: unknown): Promise<{ ok: boolean; item?: KbItem; error?: string }> {
+    const res = await fetch("/api/knowledge", {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) return { ok: false, error: data.error ?? `server returned ${res.status}` };
+    if (data.item) {
+      const i = data.item as { id: string; question: string; answer: string; updated_at: string };
+      return { ok: true, item: { id: i.id, question: i.question, answer: i.answer, updatedAt: i.updated_at } };
+    }
+    return { ok: true };
+  }
+
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!question.trim() || !answer.trim()) return;
-    const newItem: KbItem = {
-      id: `kb-demo-${Date.now()}`,
-      question: question.trim(),
-      answer: answer.trim(),
-      updatedAt: new Date().toISOString(),
-    };
-    setItems((prev) => [newItem, ...prev]);
-    setQuestion("");
-    setAnswer("");
+    setBusy(true);
+    if (live) {
+      const r = await apiCall("POST", { question: question.trim(), answer: answer.trim() });
+      if (r.ok && r.item) {
+        setItems((prev) => [r.item!, ...prev]);
+        setQuestion("");
+        setAnswer("");
+        setNotice("Saved to your knowledge base.");
+      } else {
+        setNotice(`Could not save — ${r.error}.`);
+      }
+    } else {
+      const newItem: KbItem = {
+        id: `kb-demo-${Date.now()}`,
+        question: question.trim(),
+        answer: answer.trim(),
+        updatedAt: new Date().toISOString(),
+      };
+      setItems((prev) => [newItem, ...prev]);
+      setQuestion("");
+      setAnswer("");
+      setNotice("Saved to the demo view only — sign in to keep it in your real knowledge base.");
+    }
+    setBusy(false);
   }
 
   function startEdit(item: KbItem) {
@@ -45,26 +126,47 @@ export default function KnowledgePage() {
     setEditAnswer(item.answer);
   }
 
-  function handleSaveEdit(e: React.FormEvent) {
+  async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editingId || !editQuestion.trim() || !editAnswer.trim()) return;
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === editingId
-          ? {
-              ...item,
-              question: editQuestion.trim(),
-              answer: editAnswer.trim(),
-              updatedAt: new Date().toISOString(),
-            }
-          : item,
-      ),
-    );
-    setEditingId(null);
+    setBusy(true);
+    if (live) {
+      const r = await apiCall("PUT", { id: editingId, question: editQuestion.trim(), answer: editAnswer.trim() });
+      if (r.ok && r.item) {
+        setItems((prev) => prev.map((item) => (item.id === editingId ? r.item! : item)));
+        setEditingId(null);
+        setNotice("Saved.");
+      } else {
+        setNotice(`Could not save — ${r.error}.`);
+      }
+    } else {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === editingId
+            ? { ...item, question: editQuestion.trim(), answer: editAnswer.trim(), updatedAt: new Date().toISOString() }
+            : item,
+        ),
+      );
+      setEditingId(null);
+      setNotice("Edited in the demo view only — sign in to keep it.");
+    }
+    setBusy(false);
   }
 
-  function handleDelete(id: string) {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  async function handleDelete(id: string) {
+    if (live) {
+      const r = await apiCall("DELETE", { id });
+      if (r.ok) {
+        setItems((prev) => prev.filter((item) => item.id !== id));
+        setNotice("Deleted from your knowledge base.");
+      } else {
+        setNotice(`Could not delete — ${r.error}.`);
+        return;
+      }
+    } else {
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      setNotice("Deleted from the demo view only.");
+    }
     if (editingId === id) setEditingId(null);
   }
 
@@ -75,12 +177,26 @@ export default function KnowledgePage() {
       </Link>
       <h1 className="mt-4 text-3xl font-semibold">Knowledge base</h1>
       <p className="mt-1 text-sm text-muted">
-        Demo data — not real customers.
+        {live ? "Your real knowledge base — the crew answers only from here." : "Demo data — not real customers."}
       </p>
-      <p className="mt-2 rounded-md border border-line bg-panel px-3 py-2 text-sm text-muted">
-        Demo only — stored in browser state. Real KB needs Supabase (not
-        connected yet).
-      </p>
+      {mode === "loading" ? (
+        <p className="mt-2 rounded-md border border-line bg-panel px-3 py-2 text-sm text-muted">
+          Loading your knowledge base…
+        </p>
+      ) : demo ? (
+        <p className="mt-2 rounded-md border border-line bg-panel px-3 py-2 text-sm text-muted">
+          {mode === "unauthorized"
+            ? "Demo only — sign in to use your real knowledge base. Changes here are stored in browser state only."
+            : mode === "not-configured"
+              ? "Demo only — stored in browser state. Real KB needs Supabase (not connected yet)."
+              : "Demo only — stored in browser state. Sign in to use your real knowledge base."}
+        </p>
+      ) : null}
+      {notice && (
+        <p role="status" className="mt-2 rounded-md border border-line bg-panel px-3 py-2 text-sm font-medium text-approve">
+          {notice}
+        </p>
+      )}
 
       <label className="mt-6 block">
         <span className="text-sm font-medium">Search</span>
@@ -118,8 +234,8 @@ export default function KnowledgePage() {
           </label>
           <button
             type="submit"
-            disabled={!question.trim() || !answer.trim()}
-            className="rounded-md min-h-11 bg-cta px-4 py-2 text-sm font-medium text-void hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={busy || !question.trim() || !answer.trim()}
+            className="rounded-md min-h-11 bg-cta px-4 py-2 text-sm font-medium text-void transition-transform duration-200 hover:-translate-y-px hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 active:translate-y-0 active:scale-[0.98]"
           >
             Add to knowledge base
           </button>
@@ -164,7 +280,8 @@ export default function KnowledgePage() {
                     <div className="flex gap-3">
                       <button
                         type="submit"
-                        className="rounded-md min-h-11 bg-cta px-4 py-2 text-sm font-medium text-void hover:opacity-90"
+                        disabled={busy}
+                        className="rounded-md min-h-11 bg-cta px-4 py-2 text-sm font-medium text-void hover:opacity-90 disabled:opacity-50"
                       >
                         Save
                       </button>
@@ -198,7 +315,7 @@ export default function KnowledgePage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => void handleDelete(item.id)}
                         className="inline-flex min-h-11 items-center text-sm font-medium text-reject hover:underline"
                       >
                         Delete
