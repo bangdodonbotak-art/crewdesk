@@ -12,9 +12,12 @@ import { DEMO_NOTICE, PLANS } from "@/lib/site-data";
  * Auto-play: on mount (no-preference only) it runs ONE ambient cycle
  * Triage → Reply → Approve (~2.75s per step, typing indicator + progress
  * bar), then stops at the review state with a Replay button. It never
- * loops. Pause button (≥44px) + pause on hover/focus. Any manual
- * interaction stops auto-play. In prefers-reduced-motion it shows a
- * static review frame + manual controls only.
+ * loops. The Pause button (≥44px) is the ONLY pause control — hover and
+ * focus NEVER pause the demo (FIX-REPORT-3D-4: a parked pointer over the
+ * step rows froze the ambient run for 20s live, twice; the Pause button
+ * is the WCAG affordance). Any manual interaction stops auto-play. In
+ * prefers-reduced-motion it shows a static review frame + manual
+ * controls only.
  */
 
 export interface CrewStep {
@@ -107,7 +110,6 @@ export default function InboxSimulator() {
   const [isAuto, setIsAuto] = useState(false);
   const [autoDone, setAutoDone] = useState(false);
   const [manualPaused, setManualPaused] = useState(false);
-  const [hoverPaused, setHoverPaused] = useState(false);
   const [outOfViewPaused, setOutOfViewPaused] = useState(false);
   // FIX-REPORT-3D-2: the scroll-linked hold failed twice live (GSAP pin,
   // then CSS sticky) with NO measurable root cause — rule applied
@@ -153,50 +155,32 @@ export default function InboxSimulator() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const prevInViewRef = useRef(false);
-  // Hover-pause is armed by default so the first hover pauses the ambient
-  // cycle. clearPause() DISARMS it: after Resume the timer must actually
-  // run while the pointer is still over the card — it re-arms only on a
-  // fresh pointerleave → mouseenter cycle (F-1 root cause).
-  const hoverArmedRef = useRef(true);
-  // FIX-REPORT-3D: hover-pause is a convenience for the AMBIENT autoplay
-  // ONLY. Once the user touches any control, hover must never pause the
-  // engine again for that run: in the live audit the timer stayed frozen
-  // after Resume, and a scroll-induced mouseenter (elements moving under
-  // a stationary pointer) or a focusin can re-engage it. hoverEnabled
-  // flips false on any manual control and back true only when a NEW
-  // ambient cycle starts. The mouseleave/onBlur re-arm is GONE — a
-  // re-enter after Resume must not freeze the timer again.
-  const hoverEnabledRef = useRef(true);
-  // Hover/focus pause only exists on devices that really hover
-  // ((hover: hover) and (pointer: fine)). Coarse pointers never set
-  // hoverPaused — on touch a tap would otherwise freeze the engine
-  // with no pointerleave to release it (ensemble).
-  const canHoverPauseRef = useRef(false);
+  // FIX-REPORT-3D-4: there is NO hover/focus pause anymore. It existed
+  // through round 3 as a "convenience" for ambient autoplay, but live
+  // re-audit #3 proved it is a defect: parking the mouse over the step
+  // rows froze the demo on that step for 20s (twice), resuming only
+  // ~10s after the pointer left — exactly when a visitor hovers the
+  // simulator to look at it, the demo stops and the layers collapse to
+  // rest. The Pause button is the only pause control (WCAG).
   // FIX-REPORT-3D-2: explosionPlaying pauses the step engine for the
   // 2.4s auto-play, then it resumes where it left off. The old
   // scrollMode pause is gone with the scrub.
-  const paused =
-    manualPaused || hoverPaused || outOfViewPaused || explosionPlaying;
+  const paused = manualPaused || outOfViewPaused || explosionPlaying;
   // Diagnostic for the live check: which pause flags are active now.
   const pauseFlags =
     [
       manualPaused ? "manual" : null,
-      hoverPaused ? "hover" : null,
       outOfViewPaused ? "outofview" : null,
       explosionPlaying ? "explosion" : null,
     ]
       .filter(Boolean)
       .join("+") || "none";
 
-  // Atomic pause reset: clears EVERY pause flag at once (ensemble — the
-  // old Resume cleared only manualPaused, so hoverPaused kept the timer
-  // frozen). Also disarms hover-pause until the pointer leaves and
-  // re-enters, so Resume works while the pointer stays over the card.
+  // Pause reset: clears the manual pause flag. There is no hover flag
+  // anymore (FIX-REPORT-3D-4) — Resume works while the pointer stays
+  // over the card because nothing re-freezes the timer on hover.
   const clearPause = () => {
     setManualPaused(false);
-    setHoverPaused(false);
-    hoverArmedRef.current = false;
-    hoverEnabledRef.current = false;
   };
 
   // FIX-REPORT-3D-3: clear the pending explosion chain (Replay clicked
@@ -209,9 +193,6 @@ export default function InboxSimulator() {
   // Mount: one ambient auto-play cycle — or a static review frame when the
   // user prefers reduced motion.
   useEffect(() => {
-    canHoverPauseRef.current = window.matchMedia(
-      "(hover: hover) and (pointer: fine)",
-    ).matches;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (mq.matches) {
       setReducedMotion(true);
@@ -227,9 +208,6 @@ export default function InboxSimulator() {
     setCurrentStep(0);
     setRunning(true);
     setIsAuto(true);
-    // A fresh ambient cycle re-enables hover-pause (FIX-REPORT-3D).
-    hoverArmedRef.current = true;
-    hoverEnabledRef.current = true;
     // FIX-REPORT-3D-2: arm the into-view explosion (desktop fine pointer
     // ≥1025px only). The observer effect below does the rest.
     if (
@@ -274,9 +252,6 @@ export default function InboxSimulator() {
           setCurrentStep(0);
           setRunning(true);
           setIsAuto(true);
-          // A fresh ambient cycle re-enables hover-pause (FIX-REPORT-3D).
-          hoverArmedRef.current = true;
-          hoverEnabledRef.current = true;
         }
       },
       // NOTE: threshold is 0, not 0.3 — the simulator card is taller than
@@ -472,19 +447,48 @@ export default function InboxSimulator() {
         ? (currentStep + 1) / STEPS.length
         : 1;
 
+  // FIX-REPORT-3D-4: numbered captions DWELL with their step. Round 3
+  // showed the numbered caption only during the 2.4s pulse (~0.6s each,
+  // then the intro line for the whole step dwell — a Step 2 parked for
+  // 20s showed the intro line, not 3/4, and 1/4 never appeared at all).
+  // Now: during the pulse the caption steps 1/4→4/4; after it, the
+  // caption follows the step engine — 1/4 for the whole Triage dwell,
+  // 2/4 for Reply, 3/4 for Approve. At review the decision is still
+  // pending, so 3/4 stays ("Approve: you decide"); once sent, 4/4.
+  // The intro line shows only when idle / rejected.
+  const explosionCaption = explosionPlaying
+    ? EXPLODE_CAPTIONS[Math.max(0, explodeStep - 1)]
+    : stage === "working"
+      ? EXPLODE_CAPTIONS[Math.max(0, Math.min(2, currentStep))]
+      : stage === "review" || stage === "editing"
+        ? EXPLODE_CAPTIONS[2]
+        : stage === "sent"
+          ? EXPLODE_CAPTIONS[3]
+          : "Watch one message pull apart — Triage · Reply · Approve";
+
   // FIX-REPORT-3D-3: layer transform from React state (explodeStep).
   // Same values as the old GSAP timeline (triage y -32 / rotX -8 / z 30;
   // reply z 70 / scale 1.02; approve y +32 / rotX +8 / z 30), same 0.6s
   // per step. Identity keeps the same function list so the browser
   // interpolates smoothly. The transition lives in the inline style so
   // it cannot be overridden by the Tailwind transition-opacity class.
-  const layerTransform = (id: string): string => {
-    const out =
+  // FIX-REPORT-3D-4: the separation PERSISTS during the step dwell.
+  // Round 3 left the rows at rest for ~6s of the ~8s run — the full
+  // separation was only a ~2s pulse at run start. Now a layer is out
+  // when EITHER the intro pulse says so OR its step is the active one
+  // (stage working, currentStep === index): the active step's layer
+  // stays out while it works, and everything reassembles only when the
+  // run reaches review. During the pulse the engine is paused at step 0,
+  // so triage is out via both rules at once — no double-motion.
+  const layerTransform = (id: string, index: number): string => {
+    const pulseOut =
       id === "triage"
         ? explodeStep >= 1 && explodeStep <= 3
         : id === "reply"
           ? explodeStep >= 2 && explodeStep <= 3
           : explodeStep === 3;
+    const dwellOut = stage === "working" && currentStep === index;
+    const out = pulseOut || dwellOut;
     if (!out) {
       return id === "reply"
         ? "translate3d(0px, 0px, 0px) scale(1)"
@@ -502,36 +506,10 @@ export default function InboxSimulator() {
       data-explosion-reason={explosionReason}
       data-pause={pauseFlags}
       className="rounded-xl border border-line bg-panel p-5 shadow-sm sm:p-6"
-      onMouseEnter={() => {
-        if (
-          canHoverPauseRef.current &&
-          hoverArmedRef.current &&
-          hoverEnabledRef.current
-        )
-          setHoverPaused(true);
-      }}
-      onMouseLeave={() => {
-        setHoverPaused(false);
-        // FIX-REPORT-3D: no re-arm. A scroll-induced re-enter after
-        // Resume must not freeze the timer again.
-      }}
-      onFocus={() => {
-        // FIX-REPORT-3D: focus respects the same gates as hover — the
-        // old handler set hoverPaused unconditionally, so focusing the
-        // Pause/Resume button re-paused the engine after Resume.
-        if (
-          canHoverPauseRef.current &&
-          hoverArmedRef.current &&
-          hoverEnabledRef.current
-        )
-          setHoverPaused(true);
-      }}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node)) {
-          setHoverPaused(false);
-          // FIX-REPORT-3D: no re-arm (see onMouseLeave).
-        }
-      }}
+      // FIX-REPORT-3D-4: NO mouse/focus pause handlers on this card.
+      // Hover/focus pause froze the ambient demo whenever the pointer
+      // parked over the step rows (live: 20s freeze, twice). The Pause
+      // button below is the only pause control.
     >
       {/* Terminal header bar */}
       <div className="flex items-center justify-between gap-3 border-b border-line pb-4">
@@ -579,9 +557,7 @@ export default function InboxSimulator() {
           page cannot keep. */}
       {explosionState !== "static" && (
         <p className="mt-3 font-mono text-xs text-accent" aria-live="polite">
-          {explosionPlaying
-            ? EXPLODE_CAPTIONS[Math.max(0, explodeStep - 1)]
-            : "Watch one message pull apart — Triage · Reply · Approve"}
+          {explosionCaption}
         </p>
       )}
 
@@ -639,12 +615,10 @@ export default function InboxSimulator() {
           <button
             type="button"
             onClick={() => {
-              // Resume must clear EVERY pause flag at once (F-1): the old
-              // toggle cleared only manualPaused, so hoverPaused kept the
-              // timer frozen while the pointer stayed over the card.
-              // FIX-REPORT-3D: any touch of this button is a manual
-              // control — hover-pause stays off for the rest of the run.
-              hoverEnabledRef.current = false;
+              // Resume must clear the manual pause flag (F-1). There is
+              // no hover flag anymore (FIX-REPORT-3D-4), so nothing
+              // re-freezes the timer while the pointer stays over the
+              // card after Resume.
               if (manualPaused) clearPause();
               else setManualPaused(true);
             }}
@@ -683,8 +657,15 @@ export default function InboxSimulator() {
         </span>
       </div>
 
-      {/* Crew steps — fixed min-height, no layout shift when steps change */}
-      <div className="mt-6 min-h-[240px] border-t border-line pt-6 sm:min-h-[216px]">
+      {/* Crew steps — fixed min-height, no layout shift when steps change.
+          FIX-REPORT-3D-4: pt-10 (40px) above the rows and mt-12 (48px)
+          below them — the triage row rises 32px and the approve row
+          drops 32px at full separation; the old pt-6/mt-4 left the
+          approve description colliding with the caption line below
+          ("Demo:Demo: you decide…") mid-transition. Now 8px clear above
+          the divider and 16px clear below the last row, at any point
+          in the transition and for the whole step dwell. */}
+      <div className="mt-6 min-h-[240px] border-t border-line pt-10 sm:min-h-[216px]">
         <ol className="space-y-4 [perspective:1000px]">
           {STEPS.map((step, index) => {
             const isDone = allStepsDone || currentStep > index;
@@ -694,7 +675,7 @@ export default function InboxSimulator() {
                 key={step.id}
                 data-layer={step.id}
                 style={{
-                  transform: layerTransform(step.id),
+                  transform: layerTransform(step.id, index),
                   transition: "transform 0.6s ease-in-out, opacity 0.3s ease",
                 }}
                 className={`flex gap-4 transition-opacity duration-300 ${
@@ -741,7 +722,7 @@ export default function InboxSimulator() {
             );
           })}
         </ol>
-        <p className="mt-4 text-xs text-meta">
+        <p className="mt-12 text-xs text-meta">
           {stage === "working"
             ? "Demo: the crew is working through each step."
             : stage === "idle"
